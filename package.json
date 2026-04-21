@@ -1,0 +1,48 @@
+{
+  "name": "produflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ProduFlow monorepo - SaaS industrial multi-tenant para controle de producao",
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=20 <25",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build:shared": "pnpm --filter @produflow/types --filter @produflow/config --filter @produflow/utils --filter @produflow/ui build",
+    "dev": "pnpm --parallel --filter @produflow/api --filter @produflow/web dev",
+    "dev:api": "pnpm --filter @produflow/api dev",
+    "dev:web": "pnpm --filter @produflow/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "prisma:generate": "pnpm --filter @produflow/api prisma:generate",
+    "prisma:migrate": "pnpm --filter @produflow/api prisma:migrate",
+    "prisma:seed": "pnpm --filter @produflow/api prisma:seed",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.25.1",
+    "globals": "^16.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "prettier": "^3.5.3",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.30.1"
+  }
+}

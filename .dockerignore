@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.git
+pnpm-lock.yaml
+apps/web/dist
+apps/api/dist
