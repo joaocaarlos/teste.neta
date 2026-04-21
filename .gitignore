@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+.turbo
+.DS_Store
+.env
+.env.local
+.env.test
+.pnpm-store
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+apps/api/prisma/test.db
+apps/api/prisma/test.db-journal
+apps/web/.vite
