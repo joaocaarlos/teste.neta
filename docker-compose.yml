@@ -1,0 +1,169 @@
+services:
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: capacity_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-capacity}
+      POSTGRES_PASSWORD: ${DB_PASS:-capacity123}
+      POSTGRES_DB: ${DB_NAME:-capacity}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./db/02_seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-capacity} -d ${DB_NAME:-capacity}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis (sessões / cache) ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: capacity_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASS:-redis123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS:-redis123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── API Node.js ──────────────────────────────────────────────────────────────
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: capacity_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-capacity}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-capacity123}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:9000/minio/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: capacity_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-capacity}
+      DB_PASS: ${DB_PASS:-capacity123}
+      DB_NAME: ${DB_NAME:-capacity}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASS:-redis123}
+      JWT_SECRET: ${JWT_SECRET:-supersecretkey_change_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      UPLOAD_DIR: /app/uploads
+      UPLOAD_MAX_BYTES: ${UPLOAD_MAX_BYTES:-10485760}
+      UPLOAD_STORAGE: ${UPLOAD_STORAGE:-s3}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-capacity-uploads}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-capacity}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-capacity123}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      MAIL_FROM: "${MAIL_FROM:-CapaCity <noreply@capacity.local>}"
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      EMAIL_QUEUE_ENABLED: ${EMAIL_QUEUE_ENABLED:-true}
+      EMAIL_QUEUE_CONCURRENCY: ${EMAIL_QUEUE_CONCURRENCY:-3}
+      ERROR_WEBHOOK_URL: ${ERROR_WEBHOOK_URL:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-manual}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-brl}
+      ALLOW_MANUAL_PAYMENTS: ${ALLOW_MANUAL_PAYMENTS:-true}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - ./api/src:/app/src   # hot-reload em dev
+      - uploads_data:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ─── Frontend (nginx + React build) ──────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_TRACES_SAMPLE_RATE: ${VITE_SENTRY_TRACES_SAMPLE_RATE:-0}
+    container_name: capacity_frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+  # ─── pgAdmin (opcional, apenas em dev) ───────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: capacity_pgadmin
+    restart: unless-stopped
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@capacity.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASS:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+  redis_data:
+  uploads_data:
+  minio_data:
