@@ -1,0 +1,251 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false   # never cancel an in-flight deploy
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # Guard: only run if CI passed on the same commit
+  # ────────────────────────────────────────────────────────────
+  check-ci:
+    name: Require CI green
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI workflow status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: context.sha,
+              workflow_id: 'ci.yml',
+              per_page: 1,
+            });
+            const run = runs.workflow_runs?.[0];
+            if (!run || run.conclusion !== 'success') {
+              core.setFailed(`CI has not passed for commit ${context.sha}. Status: ${run?.conclusion ?? 'not found'}`);
+            }
+
+  # ────────────────────────────────────────────────────────────
+  # Push images to registry
+  # ────────────────────────────────────────────────────────────
+  publish-images:
+    name: Publish Docker Images
+    runs-on: ubuntu-latest
+    needs: [check-ci]
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}/api
+            ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable=true
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/capacity-api:${{ github.sha }},ghcr.io/${{ github.repository_owner }}/capacity-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/capacity-frontend:${{ github.sha }},ghcr.io/${{ github.repository_owner }}/capacity-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────────
+  # Deploy to STAGING (automatic)
+  # ────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    runs-on: ubuntu-latest
+    needs: [publish-images]
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to staging via SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE_TAG: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" bash -s << 'ENDSSH'
+            set -euo pipefail
+            cd "${DEPLOY_PATH}/staging"
+
+            git fetch origin main
+            git checkout origin/main -- docker-compose.yml docker-compose.staging.yml .env.staging
+
+            export IMAGE_TAG="${IMAGE_TAG}"
+            export REPO_OWNER="${REPO_OWNER}"
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            docker compose -f docker-compose.yml -f docker-compose.staging.yml pull api frontend
+
+            docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --no-build --remove-orphans
+
+            docker image prune -f --filter "until=24h"
+          ENDSSH
+
+      - name: Health check staging
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+        run: |
+          echo "Waiting for staging to be healthy..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/health/live" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Staging is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — retrying in 10s..."
+            sleep 10
+          done
+          echo "Staging health check failed after 2 minutes"
+          exit 1
+
+  # ────────────────────────────────────────────────────────────
+  # Deploy to PRODUCTION (requires manual approval)
+  # ────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy → Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to production via SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE_TAG: ${{ github.sha }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          ssh "$SSH_USER@$SSH_HOST" bash -s << 'ENDSSH'
+            set -euo pipefail
+            cd "${DEPLOY_PATH}/production"
+
+            git fetch origin main
+            git checkout origin/main -- docker-compose.yml docker-compose.prod.yml .env.production
+
+            export IMAGE_TAG="${IMAGE_TAG}"
+            export REPO_OWNER="${REPO_OWNER}"
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T db \
+              pg_dump -U capacity capacity | gzip > /backups/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz || true
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api frontend
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans
+
+            docker image prune -f --filter "until=48h"
+          ENDSSH
+
+      - name: Health check production
+        id: healthcheck
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          echo "Waiting for production to be healthy..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${PRODUCTION_URL}/health/live" || true)
+            READY=$(curl -s -o /dev/null -w "%{http_code}" "${PRODUCTION_URL}/health/ready" || true)
+            if [ "$STATUS" = "200" ] && [ "$READY" = "200" ]; then
+              echo "Production is healthy (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i: live=$STATUS ready=$READY — retrying in 10s..."
+            sleep 10
+          done
+          echo "Production health check failed after 3 minutes"
+          exit 1
+
+      - name: Rollback on failure
+        if: failure() && steps.healthcheck.outcome == 'failure'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          echo "Health check failed. Rolling back to previous version..."
+          ssh "$SSH_USER@$SSH_HOST" bash -s << 'ENDSSH'
+            set -euo pipefail
+            cd "${DEPLOY_PATH}/production"
+
+            PREV_TAG=$(docker inspect --format='{{ index .Config.Labels "previous-sha" }}' \
+              "$(docker compose ps -q api | head -1)" 2>/dev/null || echo "latest")
+
+            echo "Rolling back API + Frontend to: $PREV_TAG"
+            export IMAGE_TAG="$PREV_TAG"
+
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull api frontend
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --remove-orphans
+
+            echo "Rollback applied"
+          ENDSSH
