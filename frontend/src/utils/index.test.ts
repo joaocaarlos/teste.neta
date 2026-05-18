@@ -109,20 +109,20 @@ describe("normalizeSessionUser", () => {
 
   it("normaliza company_status → companyStatus", () => {
     const user = normalizeSessionUser({ company_status: "active", companyId: "c1" });
-    expect(user.companyStatus).toBe("active");
-    expect(user.company_id).toBe("c1");
+    expect(user?.companyStatus).toBe("active");
+    expect(user?.company_id).toBe("c1");
   });
 
   it("preserva companyStatus se já presente", () => {
     const user = normalizeSessionUser({ companyStatus: "verified", company_id: "c2" });
-    expect(user.companyStatus).toBe("verified");
-    expect(user.company_id).toBe("c2");
+    expect(user?.companyStatus).toBe("verified");
+    expect(user?.company_id).toBe("c2");
   });
 
   it("adiciona loginAt se ausente", () => {
     const user = normalizeSessionUser({ id: 1 });
-    expect(user.loginAt).toBeTruthy();
-    expect(new Date(user.loginAt).getFullYear()).toBeGreaterThanOrEqual(2026);
+    expect(user?.loginAt).toBeTruthy();
+    expect(new Date(user?.loginAt as string).getFullYear()).toBeGreaterThanOrEqual(2026);
   });
 });
 

@@ -5,6 +5,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { apiFetch } from "../services/api";
 import { normalizeSessionUser, clearLegacySession } from "../utils";
 import { User, UserRole, AuthContextType } from "../types";
+
+function toUser(data: unknown): User | null {
+  return normalizeSessionUser(data as Record<string, unknown>) as User | null;
+}
 import { toast } from "../utils/toast";
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -24,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           if (!cancelled) {
-            setUser(normalizeSessionUser(data));
+            setUser(toUser(data));
           }
         } else {
           clearLegacySession();
@@ -70,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         clearLegacySession();
-        const session = normalizeSessionUser(data.user);
+        const session = toUser(data.user);
         setUser(session);
         toast.success("Login realizado com sucesso!");
         return true;
@@ -113,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       clearLegacySession();
-      const session = normalizeSessionUser(data.user);
+      const session = toUser(data.user);
       setUser(session);
       toast.success("Cadastro realizado com sucesso!");
       return true;

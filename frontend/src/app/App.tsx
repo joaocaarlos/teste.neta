@@ -32,9 +32,11 @@ const StatusPage      = lazy(() => import("../features/status/StatusPage").then(
 const LegacyApp = lazy(() => import("../legacy/LegacyApp"));
 
 // New modular feature pages
-const MessagesPage  = lazy(() => import("../features/messages/MessagesPage").then(m => ({ default: m.MessagesPage })));
-const MachinesPage  = lazy(() => import("../features/machines/MachinesPage").then(m => ({ default: m.MachinesPage })));
-const CalendarPage  = lazy(() => import("../features/calendar/CalendarPage").then(m => ({ default: m.CalendarPage })));
+const MessagesPage        = lazy(() => import("../features/messages/MessagesPage").then(m => ({ default: m.MessagesPage })));
+const MachinesPage        = lazy(() => import("../features/machines/MachinesPage").then(m => ({ default: m.MachinesPage })));
+const CalendarPage        = lazy(() => import("../features/calendar/CalendarPage").then(m => ({ default: m.CalendarPage })));
+const DisputeList         = lazy(() => import("../features/disputes/DisputeList"));
+const ExecutiveDashboard  = lazy(() => import("../features/admin/ExecutiveDashboard").then(m => ({ default: m.ExecutiveDashboard })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -106,7 +108,7 @@ const router = createBrowserRouter([
   { path: "/calendario/*",          element: <RouteWrapper><CalendarPage /></RouteWrapper> },
   { path: "/chat/*",                element: <RouteWrapper><MessagesPage /></RouteWrapper> },
   { path: "/financeiro/*",          element: <LegacyApp /> },
-  { path: "/disputas/*",            element: <LegacyApp /> },
+  { path: "/disputas/*",            element: <RouteWrapper><DisputeList /></RouteWrapper> },
   { path: "/avaliacoes/*",          element: <LegacyApp /> },
   { path: "/qualidade/*",           element: <LegacyApp /> },
   { path: "/verificacao/*",         element: <LegacyApp /> },
@@ -115,7 +117,7 @@ const router = createBrowserRouter([
   { path: "/auditoria/*",           element: <LegacyApp /> },
   { path: "/config/*",              element: <LegacyApp /> },
   { path: "/configuracoes/*",       element: <LegacyApp /> },
-  { path: "/admin/*",               element: <LegacyApp /> },
+  { path: "/admin/*",               element: <RouteWrapper><ExecutiveDashboard /></RouteWrapper> },
   { path: "/contratos-recorrentes/*", element: <LegacyApp /> },
   { path: "/nda/*",                 element: <LegacyApp /> },
   { path: "/comparar/*",            element: <LegacyApp /> },
