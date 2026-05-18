@@ -31,6 +31,11 @@ const StatusPage      = lazy(() => import("../features/status/StatusPage").then(
 // Legacy app — todo o resto. Lazy para code-splitting.
 const LegacyApp = lazy(() => import("../legacy/LegacyApp"));
 
+// New modular feature pages
+const MessagesPage  = lazy(() => import("../features/messages/MessagesPage").then(m => ({ default: m.MessagesPage })));
+const MachinesPage  = lazy(() => import("../features/machines/MachinesPage").then(m => ({ default: m.MachinesPage })));
+const CalendarPage  = lazy(() => import("../features/calendar/CalendarPage").then(m => ({ default: m.CalendarPage })));
+
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
   const style = document.createElement("style");
@@ -97,9 +102,9 @@ const router = createBrowserRouter([
   { path: "/propostas/*",           element: <LegacyApp /> },
   { path: "/pedidos/*",             element: <LegacyApp /> },
   { path: "/contratos/*",           element: <LegacyApp /> },
-  { path: "/maquinas/*",            element: <LegacyApp /> },
-  { path: "/calendario/*",          element: <LegacyApp /> },
-  { path: "/chat/*",                element: <LegacyApp /> },
+  { path: "/maquinas/*",            element: <RouteWrapper><MachinesPage /></RouteWrapper> },
+  { path: "/calendario/*",          element: <RouteWrapper><CalendarPage /></RouteWrapper> },
+  { path: "/chat/*",                element: <RouteWrapper><MessagesPage /></RouteWrapper> },
   { path: "/financeiro/*",          element: <LegacyApp /> },
   { path: "/disputas/*",            element: <LegacyApp /> },
   { path: "/avaliacoes/*",          element: <LegacyApp /> },
