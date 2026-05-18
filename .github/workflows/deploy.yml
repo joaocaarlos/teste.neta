@@ -69,7 +69,7 @@ jobs:
             type=raw,value=latest,enable=true
 
       - name: Build & push API image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./api
           push: true
@@ -78,7 +78,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build & push Frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
