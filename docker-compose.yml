@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-capacity}
-      POSTGRES_PASSWORD: ${DB_PASS:-capacity123}
+      POSTGRES_PASSWORD: ${DB_PASS:?DB_PASS is required - copy .env.example to .env}
       POSTGRES_DB: ${DB_NAME:-capacity}
     volumes:
       - pg_data:/var/lib/postgresql/data
@@ -25,13 +25,13 @@ services:
     image: redis:7-alpine
     container_name: capacity_redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASS:-redis123}
+    command: redis-server ${REDIS_PASS:+--requirepass ${REDIS_PASS}}
     volumes:
       - redis_data:/data
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS:-redis123}", "ping"]
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASS:+-a $REDIS_PASS} ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,7 +44,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-capacity}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-capacity123}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     volumes:
       - minio_data:/data
     ports:
@@ -75,12 +75,12 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: ${DB_USER:-capacity}
-      DB_PASS: ${DB_PASS:-capacity123}
+      DB_PASS: ${DB_PASS:?DB_PASS is required}
       DB_NAME: ${DB_NAME:-capacity}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASS: ${REDIS_PASS:-redis123}
-      JWT_SECRET: ${JWT_SECRET:-supersecretkey_change_in_production}
+      REDIS_PASS: ${REDIS_PASS:-}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required - generate with: openssl rand -base64 48}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
@@ -91,7 +91,7 @@ services:
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_BUCKET: ${S3_BUCKET:-capacity-uploads}
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-capacity}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-capacity123}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
       APP_URL: ${APP_URL:-http://localhost:3000}
       MAIL_FROM: "${MAIL_FROM:-CapaCity <noreply@capacity.local>}"
