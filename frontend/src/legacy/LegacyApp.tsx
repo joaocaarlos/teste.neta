@@ -1,11 +1,21 @@
 // @ts-nocheck
 /**
- * LegacyApp — código JavaScript original do MVP convertido para .tsx.
- * Tem 4.264 linhas, escrito sem tipos. Conforme extraímos peças para
- * `features/` em código tipado, este arquivo encolhe.
- *
- * Esta diretiva @ts-nocheck é intencional e documentada no README de legacy/.
- * Não adicionar novas features aqui — sempre em `features/`.
+ * ╔══════════════════════════════════════════════════════════════════════════╗
+ * ║  ⚠️  ARQUIVO LEGADO — NÃO ADICIONAR NOVAS FUNCIONALIDADES AQUI  ⚠️      ║
+ * ║                                                                          ║
+ * ║  Este arquivo tem ~4.264 linhas sem tipagem TypeScript.                 ║
+ * ║  Existe apenas como ponte de transição enquanto extraímos o código      ║
+ * ║  para módulos tipados em frontend/src/features/.                        ║
+ * ║                                                                          ║
+ * ║  REGRAS:                                                                 ║
+ * ║  ❌ Proibido adicionar novas features aqui                               ║
+ * ║  ❌ Proibido corrigir bugs editando diretamente (extraia primeiro)       ║
+ * ║  ✅ Bugs críticos → corrigir aqui + abrir issue "extrair depois"        ║
+ * ║  ✅ Novo código → sempre em features/<dominio>/NomeComponente.tsx        ║
+ * ║                                                                          ║
+ * ║  Plano de migração: frontend/src/legacy/README.md                       ║
+ * ║  Issue de rastreamento: https://github.com/joaocaarlos/teste.neta/issues/4 ║
+ * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from "react";
 import {
