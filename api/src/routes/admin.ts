@@ -105,4 +105,176 @@ router.get("/disputes", authenticate, authorize("admin"), async (_req: Request, 
   } catch (err) { next(err); }
 });
 
+/**
+ * #21 — Admin resolves a dispute
+ * POST /admin/disputes/:id/resolve
+ */
+router.post(
+  "/disputes/:id/resolve",
+  authenticate,
+  authorize("admin"),
+  validate([
+    body("decision").isIn(["supplier", "buyer", "partial", "rework"]).withMessage("Decisão inválida."),
+    body("refundPercent").optional().isFloat({ min: 0, max: 100 }),
+    body("reason").isString().isLength({ min: 10, max: 2000 }),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { decision, refundPercent, reason } = req.body as {
+        decision: "supplier" | "buyer" | "partial" | "rework";
+        refundPercent?: number;
+        reason: string;
+      };
+
+      const statusMap: Record<string, string> = {
+        supplier: "resolved_supplier",
+        buyer:    "resolved_buyer",
+        partial:  "resolved_partial",
+        rework:   "rework_requested",
+      };
+
+      const { rows } = await query(
+        `UPDATE disputes
+         SET status = $1, resolved_at = NOW(), admin_decision = $2, admin_reason = $3,
+             refund_percent = $4, updated_at = NOW()
+         WHERE id = $5
+         RETURNING *`,
+        [statusMap[decision], decision, reason, refundPercent ?? null, id]
+      );
+      if (!rows[0]) return res.status(404).json({ error: "Disputa não encontrada." });
+
+      await audit(req, "Disputa resolvida pelo admin", "dispute", id, { decision, reason, refundPercent });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
+
+/**
+ * #19 — Admin manually releases escrow payment
+ * POST /admin/orders/:id/release
+ */
+router.post(
+  "/orders/:id/release",
+  authenticate,
+  authorize("admin"),
+  validate([body("reason").optional().isString().isLength({ max: 500 })]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await query(
+        `UPDATE orders
+         SET payment_status = 'released', released_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND payment_status = 'captured'
+         RETURNING id, payment_status, released_at`,
+        [id]
+      );
+      if (!rows[0]) return res.status(404).json({ error: "Pedido não encontrado ou pagamento não capturado." });
+
+      await audit(req, "Pagamento liberado manualmente pelo admin", "order", id, { reason: req.body.reason });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
+
+/**
+ * #22 — Executive KPI dashboard
+ * GET /admin/dashboard/kpis?period=7d|30d|90d
+ */
+router.get(
+  "/dashboard/kpis",
+  authenticate,
+  authorize("admin"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const periodStr  = ((req.query.period as string) || "30d").replace(/[^0-9d]/g, "");
+      const days       = Math.min(365, Math.max(1, Number(periodStr.replace("d", "")) || 30));
+      const prevDays   = days * 2;
+
+      const interval    = `'${days} days'::INTERVAL`;
+      const prevInterval = `'${prevDays} days'::INTERVAL`;
+
+      const [
+        gmvRow, prevGmvRow,
+        revenueRow, prevRevenueRow,
+        demandsRow, prevDemandsRow,
+        proposalsRow, prevProposalsRow,
+        ordersRow, prevOrdersRow,
+        completedRow, prevCompletedRow,
+        disputeRow,
+        activeSupplierRow,
+        demandNoProposalRow,
+        avgResponseRow,
+        avgTicketRow,
+        npsRow,
+        lateRow,
+      ] = await Promise.all([
+        query<{ gmv: string }>(`SELECT COALESCE(SUM(value_raw),0)::TEXT AS gmv FROM orders WHERE created_at > NOW() - ${interval}`),
+        query<{ gmv: string }>(`SELECT COALESCE(SUM(value_raw),0)::TEXT AS gmv FROM orders WHERE created_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ rev: string }>(`SELECT COALESCE(SUM(platform_fee_amount),0)::TEXT AS rev FROM orders WHERE payment_status = 'released' AND released_at > NOW() - ${interval}`),
+        query<{ rev: string }>(`SELECT COALESCE(SUM(platform_fee_amount),0)::TEXT AS rev FROM orders WHERE payment_status = 'released' AND released_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM demands WHERE created_at > NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM demands WHERE created_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM proposals WHERE created_at > NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM proposals WHERE created_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM orders WHERE created_at > NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM orders WHERE created_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM orders WHERE status = 'Finalizado' AND updated_at > NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM orders WHERE status = 'Finalizado' AND updated_at BETWEEN NOW() - ${prevInterval} AND NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM disputes WHERE status NOT IN ('Resolvida','Encerrada')`),
+        query<{ cnt: string }>(`SELECT COUNT(DISTINCT supplier_company_id)::TEXT AS cnt FROM orders WHERE created_at > NOW() - ${interval}`),
+        query<{ cnt: string }>(`SELECT COUNT(*)::TEXT AS cnt FROM demands d WHERE NOT EXISTS (SELECT 1 FROM proposals p WHERE p.demand_id = d.id) AND d.status IN ('Em cotação','Em negociação') AND d.created_at > NOW() - ${interval}`),
+        query<{ avg_h: string }>(`SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (p.created_at - d.published_at)) / 3600), 0)::TEXT AS avg_h FROM proposals p JOIN demands d ON d.id = p.demand_id WHERE d.published_at > NOW() - ${interval} AND p.id = (SELECT id FROM proposals WHERE demand_id = d.id ORDER BY created_at LIMIT 1)`),
+        query<{ avg_ticket: string }>(`SELECT COALESCE(AVG(value_raw), 0)::TEXT AS avg_ticket FROM orders WHERE status = 'Finalizado' AND updated_at > NOW() - ${interval}`),
+        query<{ avg_nps: string }>(`SELECT COALESCE(AVG(rating), 0)::TEXT AS avg_nps FROM reviews WHERE created_at > NOW() - ${interval}`),
+        query<{ late: string; total: string }>(`SELECT COUNT(*) FILTER (WHERE deadline_at < NOW() AND status NOT IN ('Finalizado','Cancelado'))::TEXT AS late, COUNT(*)::TEXT AS total FROM orders WHERE status NOT IN ('Finalizado','Cancelado')`),
+      ]);
+
+      const pct = (curr: number, prev: number) =>
+        prev === 0 ? null : Number((((curr - prev) / prev) * 100).toFixed(1));
+
+      const gmv     = Number(gmvRow.rows[0]?.gmv ?? 0);
+      const prevGmv = Number(prevGmvRow.rows[0]?.gmv ?? 0);
+      const rev     = Number(revenueRow.rows[0]?.rev ?? 0);
+      const prevRev = Number(prevRevenueRow.rows[0]?.rev ?? 0);
+      const demands = Number(demandsRow.rows[0]?.cnt ?? 0);
+      const prevDemands = Number(prevDemandsRow.rows[0]?.cnt ?? 0);
+      const proposals = Number(proposalsRow.rows[0]?.cnt ?? 0);
+      const prevProposals = Number(prevProposalsRow.rows[0]?.cnt ?? 0);
+      const orders  = Number(ordersRow.rows[0]?.cnt ?? 0);
+      const prevOrders = Number(prevOrdersRow.rows[0]?.cnt ?? 0);
+      const completed = Number(completedRow.rows[0]?.cnt ?? 0);
+      const prevCompleted = Number(prevCompletedRow.rows[0]?.cnt ?? 0);
+      const late    = Number(lateRow.rows[0]?.late ?? 0);
+      const lateTotal = Number(lateRow.rows[0]?.total ?? 1);
+
+      res.json({
+        period: `${days}d`,
+        kpis: {
+          gmv:              { value: gmv,       change: pct(gmv, prevGmv) },
+          revenue:          { value: rev,       change: pct(rev, prevRev) },
+          demands:          { value: demands,   change: pct(demands, prevDemands) },
+          proposals:        { value: proposals, change: pct(proposals, prevProposals) },
+          orders:           { value: orders,    change: pct(orders, prevOrders) },
+          completed:        { value: completed, change: pct(completed, prevCompleted) },
+          disputesOpen:     { value: Number(disputeRow.rows[0]?.cnt ?? 0) },
+          activeSuppliers:  { value: Number(activeSupplierRow.rows[0]?.cnt ?? 0) },
+          demandsNoProposal:{ value: Number(demandNoProposalRow.rows[0]?.cnt ?? 0) },
+          avgFirstResponseH:{ value: Number(Number(avgResponseRow.rows[0]?.avg_h ?? 0).toFixed(1)) },
+          avgTicket:        { value: Number(Number(avgTicketRow.rows[0]?.avg_ticket ?? 0).toFixed(2)) },
+          nps:              { value: Number(Number(npsRow.rows[0]?.avg_nps ?? 0).toFixed(2)) },
+          lateOrdersRate:   { value: lateTotal > 0 ? Number((late / lateTotal).toFixed(3)) : 0 },
+        },
+        conversionFunnel: {
+          demands,
+          proposals,
+          orders,
+          completed,
+        },
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (err) { next(err); }
+  }
+);
+
 export default router;

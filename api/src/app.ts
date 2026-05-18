@@ -14,38 +14,17 @@ import { initErrorTracking } from "./lib/error-tracking";
 import { pingRedis } from "./lib/redis";
 import { ensureUploadStorageReady } from "./lib/upload";
 import { metricsHandler, metricsMiddleware } from "./lib/metrics";
+import { env } from "./config/env";
 
-import authRoutes          from "./routes/auth";
-import usersRoutes         from "./routes/users";
-import demandsRoutes       from "./routes/demands";
-import proposalsRoutes     from "./routes/proposals";
-import ordersRoutes        from "./routes/orders";
-import machinesRoutes      from "./routes/machines";
-import companiesRoutes     from "./routes/companies";
-import contractsRoutes     from "./routes/contracts";
-import ndasRoutes          from "./routes/ndas";
-import transactionsRoutes  from "./routes/transactions";
-import disputesRoutes      from "./routes/disputes";
-import reviewsRoutes       from "./routes/reviews";
-import recurringRoutes     from "./routes/recurring";
-import auditRoutes         from "./routes/audit";
-import notificationsRoutes from "./routes/notifications";
-import messagesRoutes      from "./routes/messages";
-import calendarRoutes      from "./routes/calendar";
-import verificationRoutes  from "./routes/verification";
-import eventsRoutes        from "./routes/events";
-import uploadsRoutes       from "./routes/uploads";
-import feedbackRoutes      from "./routes/feedback";
-import adminRoutes         from "./routes/admin";
-import proposalTemplatesRoutes from "./routes/proposal-templates";
-import sitemapRoutes       from "./routes/sitemap";
-import statusRoutes        from "./routes/status";
+import v1Routes          from "./routes/v1";
+import sitemapRoutes     from "./routes/sitemap";
+import statusRoutes      from "./routes/status";
 import { stripeWebhook } from "./routes/stripe-webhook";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
-const corsOrigins = process.env.CORS_ORIGIN?.split(",").map((s) => s.trim()).filter(Boolean) || ["http://localhost:3000"];
+const JWT_SECRET = env.JWT_SECRET;
+const corsOrigins = env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean);
 
 void initErrorTracking();
 
@@ -56,7 +35,7 @@ function rateLimitKey(req: Request): string {
       const payload = jwt.verify(tokenInfo.token, JWT_SECRET) as JwtPayload;
       if (payload.userId) return `user:${payload.userId}`;
     } catch {
-      // authenticate retornara 401 depois; aqui apenas caimos para IP.
+      // fall through to IP
     }
   }
   return `ip:${req.ip || "unknown"}`;
@@ -68,6 +47,12 @@ app.set("trust proxy", 1);
 app.use(requestIdMiddleware);
 app.use(metricsMiddleware);
 app.use(compression({ level: 6, threshold: 1024 }));
+
+// Inject X-API-Version on every response
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("X-API-Version", "1.0");
+  next();
+});
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -83,11 +68,11 @@ app.use(helmet({
       connectSrc: ["'self'", ...corsOrigins, "https://api.stripe.com"],
       scriptSrc: ["'self'", "https://js.stripe.com"],
       frameSrc: ["'self'", "https://js.stripe.com", "https://hooks.stripe.com"],
-      upgradeInsecureRequests: process.env.NODE_ENV === "production" ? [] : null,
+      upgradeInsecureRequests: env.NODE_ENV === "production" ? [] : null,
       ...(process.env.CSP_REPORT_URI ? { reportUri: [process.env.CSP_REPORT_URI] as string[] } : {}),
     },
   },
-  strictTransportSecurity: process.env.NODE_ENV === "production"
+  strictTransportSecurity: env.NODE_ENV === "production"
     ? { maxAge: 63072000, includeSubDomains: true, preload: true }
     : false,
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -116,13 +101,15 @@ app.use(cors({
   credentials: true,
 }));
 app.use(requestLogMiddleware);
+
+// Stripe webhook must come before express.json() to receive raw body
 app.post("/api/transactions/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhook);
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: Number(process.env.RATE_LIMIT_MAX) || 500,
+  max: env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: rateLimitKey,
@@ -132,8 +119,8 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 
 function protectMetrics(req: Request, res: Response, next: NextFunction): void {
-  const token = process.env.METRICS_TOKEN;
-  if (!token && process.env.NODE_ENV !== "production") return next();
+  const token = env.METRICS_TOKEN;
+  if (!token && env.NODE_ENV !== "production") return next();
   const supplied = req.get("x-metrics-token") || req.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (token && supplied === token) return next();
   res.status(404).json({ error: "Rota nao encontrada." });
@@ -141,9 +128,7 @@ function protectMetrics(req: Request, res: Response, next: NextFunction): void {
 
 app.get("/metrics", protectMetrics, metricsHandler);
 
-const docsEnabled =
-  process.env.NODE_ENV !== "production" ||
-  process.env.ENABLE_API_DOCS === "true";
+const docsEnabled = env.NODE_ENV !== "production" || env.ENABLE_API_DOCS;
 
 if (docsEnabled) {
   app.use(
@@ -171,11 +156,7 @@ export async function readinessChecks(): Promise<Record<string, { ok: boolean; d
     await pool.query("SELECT 1");
     checks.db = {
       ok: true,
-      detail: {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
-      },
+      detail: { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount },
     };
   } catch (err) {
     checks.db = { ok: false, detail: (err as Error).message };
@@ -205,10 +186,7 @@ export async function readinessChecks(): Promise<Record<string, { ok: boolean; d
 
   try {
     const { rows } = await pool.query<{ id: string; applied_at: string }>(
-      `SELECT id, applied_at
-       FROM schema_migrations
-       ORDER BY applied_at DESC
-       LIMIT 1`
+      `SELECT id, applied_at FROM schema_migrations ORDER BY applied_at DESC LIMIT 1`
     );
     checks.migrations = { ok: true, detail: rows[0] || { applied: 0 } };
   } catch (err) {
@@ -226,48 +204,21 @@ export async function readinessChecks(): Promise<Record<string, { ok: boolean; d
 }
 
 app.get("/health/live", (_req, res) => {
-  res.json({
-    status: "ok",
-    uptime: process.uptime(),
-    ts: new Date().toISOString(),
-  });
+  res.json({ status: "ok", uptime: process.uptime(), ts: new Date().toISOString() });
 });
 
 app.get(["/health", "/health/ready"], async (_req, res) => {
   const checks = await readinessChecks();
   const ok = Object.values(checks).every((c) => c.ok);
-  res.status(ok ? 200 : 503).json({
-    status: ok ? "ok" : "error",
-    checks,
-    ts: new Date().toISOString(),
-  });
+  res.status(ok ? 200 : 503).json({ status: ok ? "ok" : "error", checks, ts: new Date().toISOString() });
 });
 
-app.use("/api/auth",          authRoutes);
-app.use("/api/users",         usersRoutes);
-app.use("/api/demands",       demandsRoutes);
-app.use("/api/proposals",     proposalsRoutes);
-app.use("/api/orders",        ordersRoutes);
-app.use("/api/machines",      machinesRoutes);
-app.use("/api/companies",     companiesRoutes);
-app.use("/api/contracts",     contractsRoutes);
-app.use("/api/ndas",          ndasRoutes);
-app.use("/api/transactions",  transactionsRoutes);
-app.use("/api/disputes",      disputesRoutes);
-app.use("/api/reviews",       reviewsRoutes);
-app.use("/api/recurring",     recurringRoutes);
-app.use("/api/audit",         auditRoutes);
-app.use("/api/notifications", notificationsRoutes);
-app.use("/api/messages",      messagesRoutes);
-app.use("/api/calendar",      calendarRoutes);
-app.use("/api/verification",  verificationRoutes);
-app.use("/api/events",        eventsRoutes);
-app.use("/api/uploads",       uploadsRoutes);
-app.use("/api/feedback",      feedbackRoutes);
-app.use("/api/admin",         adminRoutes);
-app.use("/api/proposal-templates", proposalTemplatesRoutes);
-app.use("/",                  sitemapRoutes);
-app.use("/api",               statusRoutes);
+// v1 routes mounted at /api/v1 (canonical) and /api (backward compat alias)
+app.use("/api/v1", v1Routes);
+app.use("/api",    v1Routes);
+
+app.use("/",    sitemapRoutes);
+app.use("/api", statusRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Rota nao encontrada." });

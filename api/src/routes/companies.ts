@@ -489,4 +489,94 @@ router.post("/:id/reactivate", authenticate, authorize("admin"), async (req: Req
   } catch (err) { next(err); }
 });
 
+/**
+ * #20 — Supplier trust score
+ * GET /:id/trust-score
+ */
+router.get("/:id/trust-score", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+
+    const [ordersRow, ratingRow, responseRow, disputeRow, certRow, capacityRow] = await Promise.all([
+      query<{ completed: string; on_time: string }>(
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'Finalizado')::TEXT AS completed,
+           COUNT(*) FILTER (WHERE status = 'Finalizado' AND delivered_at <= deadline_at)::TEXT AS on_time
+         FROM orders WHERE supplier_company_id = $1`,
+        [id]
+      ),
+      query<{ avg_rating: string; count: string }>(
+        `SELECT COALESCE(AVG(rating), 0)::TEXT AS avg_rating, COUNT(*)::TEXT AS count
+         FROM reviews r
+         JOIN orders o ON o.id = r.order_id
+         WHERE o.supplier_company_id = $1`,
+        [id]
+      ),
+      query<{ avg_hours: string }>(
+        `SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (p.created_at - d.published_at)) / 3600), 0)::TEXT AS avg_hours
+         FROM proposals p
+         JOIN demands d ON d.id = p.demand_id
+         JOIN companies c ON c.id = p.supplier_company_id
+         WHERE c.id = $1
+           AND p.id = (SELECT id FROM proposals WHERE demand_id = d.id AND supplier_company_id = c.id ORDER BY created_at LIMIT 1)`,
+        [id]
+      ),
+      query<{ disputes: string }>(
+        `SELECT COUNT(*)::TEXT AS disputes
+         FROM disputes disp
+         JOIN orders o ON o.id = disp.order_id
+         WHERE o.supplier_company_id = $1`,
+        [id]
+      ),
+      query<{ name: string }>(
+        `SELECT name FROM certifications WHERE company_id = $1 AND verified = true`,
+        [id]
+      ),
+      query<{ available: string }>(
+        `SELECT COALESCE(SUM(available_capacity), 0)::TEXT AS available
+         FROM machines WHERE company_id = $1 AND status = 'Disponível'`,
+        [id]
+      ),
+    ]);
+
+    const completed   = Number(ordersRow.rows[0]?.completed ?? 0);
+    const onTime      = Number(ordersRow.rows[0]?.on_time   ?? 0);
+    const avgRating   = Number(ratingRow.rows[0]?.avg_rating ?? 0);
+    const avgResponse = Number(responseRow.rows[0]?.avg_hours ?? 0);
+    const disputes    = Number(disputeRow.rows[0]?.disputes  ?? 0);
+    const certifications = certRow.rows.map((r) => r.name);
+    const available   = capacityRow.rows[0]?.available ?? "0";
+
+    const onTimeRate    = completed > 0 ? onTime / completed : 0;
+    const disputeRate   = completed > 0 ? disputes / completed : 0;
+
+    // Weighted score: onTime 30%, rating 25%, lowDispute 20%, response 15%, certs 10%
+    const scoreOnTime   = onTimeRate * 30;
+    const scoreRating   = (avgRating / 5) * 25;
+    const scoreDispute  = Math.max(0, (1 - disputeRate) * 20);
+    const scoreResponse = avgResponse <= 4 ? 15 : avgResponse <= 24 ? 10 : avgResponse <= 72 ? 5 : 0;
+    const scoreCerts    = Math.min(10, certifications.length * 3);
+    const score         = Math.round(scoreOnTime + scoreRating + scoreDispute + scoreResponse + scoreCerts);
+
+    const badge =
+      completed >= 30 && avgRating >= 4.5 ? "top" :
+      completed >= 10                      ? "trusted" :
+                                             "new";
+
+    res.json({
+      score,
+      badge,
+      metrics: {
+        onTimeRate,
+        completedOrders: completed,
+        avgResponseHours: Number(avgResponse.toFixed(1)),
+        disputeRate: Number(disputeRate.toFixed(3)),
+        avgRating: Number(avgRating.toFixed(1)),
+        certifications,
+        availableCapacity: `${available} peças/mês`,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;

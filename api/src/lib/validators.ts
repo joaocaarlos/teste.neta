@@ -34,5 +34,8 @@ export const v = {
   },
   intRange(field: string, min: number, max: number) {
     return body(field).isInt({ min, max }).withMessage(`${field} deve ser um inteiro entre ${min} e ${max}.`).toInt();
-  }
+  },
+  optionalQuery(field: string) {
+    return body(field).optional({ nullable: true, checkFalsy: true }).isString();
+  },
 };

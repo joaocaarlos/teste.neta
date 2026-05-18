@@ -1,0 +1,55 @@
+import { Router } from "express";
+
+import authRoutes          from "../auth";
+import usersRoutes         from "../users";
+import demandsRoutes       from "../demands";
+import proposalsRoutes     from "../proposals";
+import ordersRoutes        from "../orders";
+import machinesRoutes      from "../machines";
+import companiesRoutes     from "../companies";
+import contractsRoutes     from "../contracts";
+import ndasRoutes          from "../ndas";
+import transactionsRoutes  from "../transactions";
+import disputesRoutes      from "../disputes";
+import reviewsRoutes       from "../reviews";
+import recurringRoutes     from "../recurring";
+import auditRoutes         from "../audit";
+import notificationsRoutes from "../notifications";
+import messagesRoutes      from "../messages";
+import calendarRoutes      from "../calendar";
+import verificationRoutes  from "../verification";
+import eventsRoutes        from "../events";
+import uploadsRoutes       from "../uploads";
+import feedbackRoutes      from "../feedback";
+import adminRoutes         from "../admin";
+import proposalTemplatesRoutes from "../proposal-templates";
+import marketplaceRoutes   from "../marketplace";
+
+const router = Router();
+
+router.use("/auth",               authRoutes);
+router.use("/users",              usersRoutes);
+router.use("/demands",            demandsRoutes);
+router.use("/proposals",          proposalsRoutes);
+router.use("/orders",             ordersRoutes);
+router.use("/machines",           machinesRoutes);
+router.use("/companies",          companiesRoutes);
+router.use("/contracts",          contractsRoutes);
+router.use("/ndas",               ndasRoutes);
+router.use("/transactions",       transactionsRoutes);
+router.use("/disputes",           disputesRoutes);
+router.use("/reviews",            reviewsRoutes);
+router.use("/recurring",          recurringRoutes);
+router.use("/audit",              auditRoutes);
+router.use("/notifications",      notificationsRoutes);
+router.use("/messages",           messagesRoutes);
+router.use("/calendar",           calendarRoutes);
+router.use("/verification",       verificationRoutes);
+router.use("/events",             eventsRoutes);
+router.use("/uploads",            uploadsRoutes);
+router.use("/feedback",           feedbackRoutes);
+router.use("/admin",              adminRoutes);
+router.use("/proposal-templates", proposalTemplatesRoutes);
+router.use("/marketplace",        marketplaceRoutes);
+
+export default router;

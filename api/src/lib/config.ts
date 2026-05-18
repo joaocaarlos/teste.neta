@@ -1,3 +1,5 @@
+import { env } from "../config/env";
+
 const DEFAULT_VALUES = new Set([
   "capacity123",
   "redis123",
@@ -37,10 +39,9 @@ function validStripeSecretKey(value?: string): boolean {
 }
 
 export function assertProductionConfig(): void {
-  if (process.env.NODE_ENV !== "production") return;
+  if (env.NODE_ENV !== "production") return;
 
   const errors: string[] = [];
-  const paymentProvider = (process.env.PAYMENTS_PROVIDER || "manual").toLowerCase();
 
   if (weak("JWT_SECRET")) errors.push("JWT_SECRET forte e obrigatorio em producao.");
   for (const name of ["DB_PASS", "REDIS_PASS", "S3_SECRET_ACCESS_KEY"]) {
@@ -49,21 +50,21 @@ export function assertProductionConfig(): void {
   if (weak("MINIO_ROOT_PASSWORD") && missing("S3_ENDPOINT")) {
     errors.push("MINIO_ROOT_PASSWORD deve ser forte quando MinIO for usado.");
   }
-  if (!isHttpsUrl(process.env.APP_URL)) errors.push("APP_URL deve usar HTTPS em producao.");
-  for (const origin of (process.env.CORS_ORIGIN || "").split(",").map((s) => s.trim()).filter(Boolean)) {
+  if (!isHttpsUrl(env.APP_URL)) errors.push("APP_URL deve usar HTTPS em producao.");
+  for (const origin of env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean)) {
     if (!isHttpsUrl(origin)) errors.push(`CORS_ORIGIN deve usar HTTPS em producao: ${origin}`);
   }
   if (!hasEmailProvider()) errors.push("Configure RESEND_API_KEY ou SMTP_HOST para envio real de e-mail.");
-  if (missing("S3_BUCKET")) errors.push("S3_BUCKET e obrigatorio para storage persistente.");
-  if (missing("SENTRY_DSN")) errors.push("SENTRY_DSN e obrigatorio para triagem de erros em producao.");
-  if (missing("ERROR_WEBHOOK_URL")) errors.push("ERROR_WEBHOOK_URL e obrigatorio para alerta de 5xx em producao.");
-  if (missing("METRICS_TOKEN")) errors.push("METRICS_TOKEN e obrigatorio para proteger /metrics em producao.");
+  if (!env.S3_BUCKET) errors.push("S3_BUCKET e obrigatorio para storage persistente.");
+  if (!env.SENTRY_DSN) errors.push("SENTRY_DSN e obrigatorio para triagem de erros em producao.");
+  if (!env.ERROR_WEBHOOK_URL) errors.push("ERROR_WEBHOOK_URL e obrigatorio para alerta de 5xx em producao.");
+  if (!env.METRICS_TOKEN) errors.push("METRICS_TOKEN e obrigatorio para proteger /metrics em producao.");
 
-  if (paymentProvider === "stripe") {
-    if (missing("STRIPE_SECRET_KEY")) errors.push("STRIPE_SECRET_KEY e obrigatorio com PAYMENTS_PROVIDER=stripe.");
-    else if (!validStripeSecretKey(process.env.STRIPE_SECRET_KEY)) errors.push("STRIPE_SECRET_KEY parece truncada ou invalida.");
-    if (missing("STRIPE_WEBHOOK_SECRET")) errors.push("STRIPE_WEBHOOK_SECRET e obrigatorio com PAYMENTS_PROVIDER=stripe.");
-  } else if (process.env.ALLOW_MANUAL_PAYMENTS !== "true") {
+  if (env.PAYMENTS_PROVIDER === "stripe") {
+    if (!env.STRIPE_SECRET_KEY) errors.push("STRIPE_SECRET_KEY e obrigatorio com PAYMENTS_PROVIDER=stripe.");
+    else if (!validStripeSecretKey(env.STRIPE_SECRET_KEY)) errors.push("STRIPE_SECRET_KEY parece truncada ou invalida.");
+    if (!env.STRIPE_WEBHOOK_SECRET) errors.push("STRIPE_WEBHOOK_SECRET e obrigatorio com PAYMENTS_PROVIDER=stripe.");
+  } else if (!env.ALLOW_MANUAL_PAYMENTS) {
     errors.push("PAYMENTS_PROVIDER=stripe e obrigatorio em producao, a menos que ALLOW_MANUAL_PAYMENTS=true.");
   }
 

@@ -431,4 +431,124 @@ router.get("/:id/timeline", authenticate, async (req: Request, res: Response, ne
   } catch (err) { next(err); }
 });
 
+// ─── #19 Escrow / Payment flow ───────────────────────────────────────────────
+
+/**
+ * POST /:id/checkout — creates a Stripe Checkout session
+ */
+router.post("/:id/checkout", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query(
+      `SELECT o.*, c.name AS buyer_name FROM orders o
+       LEFT JOIN companies c ON c.id = o.buyer_company_id
+       WHERE o.id = $1`,
+      [req.params.id]
+    );
+    const order = rows[0];
+    if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+    if (order.payment_status !== "pending") {
+      return res.status(409).json({ error: "Pedido já possui pagamento iniciado." });
+    }
+
+    const stripe = (await import("stripe")).default;
+    const stripeClient = new stripe(process.env.STRIPE_SECRET_KEY || "", { apiVersion: "2024-06-20" });
+
+    const amountCents = Math.round((order.value_raw || 0) * 100);
+    const platformFeeCents = Math.round(amountCents * 0.05); // 5% platform fee
+
+    const session = await stripeClient.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [{
+        price_data: {
+          currency: process.env.STRIPE_CURRENCY || "brl",
+          product_data: { name: `Pedido #${order.id.slice(0, 8)}` },
+          unit_amount: amountCents,
+        },
+        quantity: 1,
+      }],
+      payment_intent_data: {
+        application_fee_amount: platformFeeCents,
+        capture_method: "automatic",
+        metadata: { order_id: order.id },
+      },
+      success_url: `${process.env.APP_URL}/pedidos/${order.id}?payment=success`,
+      cancel_url:  `${process.env.APP_URL}/pedidos/${order.id}?payment=cancelled`,
+      metadata: { order_id: order.id },
+    });
+
+    await query(
+      `UPDATE orders SET stripe_payment_intent_id = $1, payment_status = 'pending', platform_fee_amount = $2, updated_at = NOW() WHERE id = $3`,
+      [session.payment_intent, platformFeeCents, order.id]
+    );
+
+    await audit(req, "Checkout Stripe criado", "order", order.id, { session_id: session.id });
+    res.json({ checkoutUrl: session.url, sessionId: session.id });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /:id/approve — buyer approves delivery, releases escrow
+ */
+router.post("/:id/approve", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM orders WHERE id = $1 AND buyer_company_id = (SELECT id FROM companies WHERE id = (SELECT company_id FROM users WHERE id = $2))`,
+      [req.params.id, req.user!.userId]
+    );
+    const order = rows[0];
+    if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+    if (order.payment_status !== "captured") {
+      return res.status(409).json({ error: "Pagamento não foi capturado ainda." });
+    }
+
+    const { rows: updated } = await query(
+      `UPDATE orders SET payment_status = 'released', released_at = NOW(), status = 'Finalizado', updated_at = NOW() WHERE id = $1 RETURNING id, payment_status, released_at`,
+      [req.params.id]
+    );
+    await audit(req, "Entrega aprovada pelo demandante", "order", req.params.id);
+    res.json(updated[0]);
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /:id/dispute — buyer opens a dispute, blocking payment release
+ */
+router.post(
+  "/:id/dispute",
+  authenticate,
+  validate([
+    body("reason").isString().isLength({ min: 20, max: 2000 }),
+    body("impact").optional().isIn(["Baixo", "Médio", "Alto", "Crítico"]),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { reason, impact = "Médio" } = req.body as { reason: string; impact?: string };
+
+      const { rows } = await query(`SELECT * FROM orders WHERE id = $1`, [req.params.id]);
+      const order = rows[0];
+      if (!order) return res.status(404).json({ error: "Pedido não encontrado." });
+      if (order.payment_status === "released") {
+        return res.status(409).json({ error: "Pagamento já liberado, não é possível abrir disputa." });
+      }
+
+      // Block payment release while dispute is open
+      await query(`UPDATE orders SET payment_status = 'disputed', updated_at = NOW() WHERE id = $1`, [req.params.id]);
+
+      const dueAt = new Date();
+      dueAt.setHours(dueAt.getHours() + 72); // 72h SLA for admin review
+
+      const { rows: dispute } = await query(
+        `INSERT INTO disputes (order_id, opened_by, description, impact, status, due_at)
+         VALUES ($1, $2, $3, $4, 'open', $5)
+         RETURNING *`,
+        [req.params.id, req.user!.userId, reason, impact, dueAt.toISOString()]
+      );
+
+      await audit(req, "Disputa aberta pelo demandante", "dispute", dispute[0].id, { reason, impact });
+      res.status(201).json(dispute[0]);
+    } catch (err) { next(err); }
+  }
+);
+
 export default router;
