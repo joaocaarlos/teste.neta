@@ -40,85 +40,18 @@ import { useConfirm } from "../hooks/useConfirm";
 import { useSSE } from "../hooks/useSSE";
 import { startCheckout } from "../services/stripe";
 
-// ─── PERSISTÊNCIA MÍNIMA (somente prefs de UI, nunca dados de negócio) ─────────
-const DB = {
-  _k: k=>`cap4_${k}`,
-  get(k){ try{return JSON.parse(localStorage.getItem(this._k(k)))}catch{return null} },
-  set(k,v){ localStorage.setItem(this._k(k),JSON.stringify(v)) },
-  del(k){ localStorage.removeItem(this._k(k)) },
-};
-
-// ─── API CLIENT ───────────────────────────────────────────────────────────────
+// ─── Módulos centralizados (extraídos do legado) ──────────────────────────────
+import { apiFetch, apiGetList as apiGet } from "../services/api";
+import {
+  DB,
+  clearLegacySession, normalizeSessionUser, getCookie,
+  fmtDate,
+  normDemand, normOrder, normProposal, normTxn, normContract,
+  normDispute, normReview, normNotif, normNDA,
+} from "../utils";
+// Usado pelas 3 chamadas fetch diretas no AuthProvider (login/register/me)
 const API_BASE = "/api";
-const TOKEN_KEY = "cap4_jwt";
-const UNSAFE_METHODS = new Set(["POST","PUT","PATCH","DELETE"]);
 
-function clearLegacySession(){
-  localStorage.removeItem(TOKEN_KEY);
-  DB.del("session");
-}
-
-function normalizeSessionUser(user){
-  if(!user) return null;
-  return {
-    ...user,
-    companyStatus:user.companyStatus||user.company_status,
-    company_id:user.company_id||user.companyId,
-    loginAt:user.loginAt||new Date().toISOString(),
-  };
-}
-
-function getCookie(name){
-  return document.cookie.split(";").map(p=>p.trim()).find(p=>p.startsWith(`${name}=`))?.slice(name.length+1)||"";
-}
-
-async function apiFetch(path, options={}){
-  const isForm = options.body instanceof FormData;
-  const csrf = getCookie("csrf_token");
-  const method = (options.method||"GET").toUpperCase();
-  const res = await fetch(`${API_BASE}${path}`,{
-    ...options,
-    credentials:"include",
-    headers:{
-      ...(isForm?{}:{"Content-Type":"application/json"}),
-      ...(UNSAFE_METHODS.has(method)&&csrf?{"X-CSRF-Token":csrf}:{}),
-      ...(options.headers||{}),
-    },
-  });
-  if(res.status===401){
-    clearLegacySession();
-    if(!path.startsWith("/auth/login")&&!path.startsWith("/auth/reset-password")&&!path.startsWith("/auth/me")) window.location.href="/";
-  }
-  return res;
-}
-
-// Função auxiliar: chama a API, desempacota {data}, e mostra erro real.
-const apiGet = async path => {
-  try{
-    const r=await apiFetch(path);
-    const json=await r.json().catch(()=>null);
-    if(!r.ok){
-      toast.error(json?.error||`Erro ao carregar ${path}`);
-      return [];
-    }
-    return Array.isArray(json?.data)?json.data:json;
-  }catch(e){
-    toast.error("Erro de conexão com o servidor.");
-    return [];
-  }
-};
-
-// ─── NORMALIZERS: mapeia campos da API para o shape usado pelos componentes ───
-const fmtDate = v=>v?new Date(v).toLocaleDateString("pt-BR"):null;
-const normDemand   = d=>({...d,proposals:d.proposals_count||d.proposals||0,nda:d.nda_required??d.nda,cert:d.cert_required??d.cert,created:d.created_at?fmtDate(d.created_at):d.created});
-const normOrder    = o=>({...o,supplier:o.supplier_company_name||o.supplier||"—",value:o.value||(o.value_raw?`R$ ${Number(o.value_raw).toLocaleString("pt-BR",{minimumFractionDigits:0})}`:"—"),gross:Number(o.value_raw)||o.gross||0});
-const normProposal = p=>({...p,supplier:p.supplier_name||p.supplier,unit:p.unit_price||p.unit,start:p.start_date||p.start,riskFactors:p.risk_factors||p.riskFactors||[]});
-const normTxn      = t=>({...t,order:t.order_id||t.order,gross:Number(t.gross)||0,commission:Number(t.commission)||0});
-const normContract = c=>({...c,pedido:c.order_id||c.pedido,gerado:c.generated_at?fmtDate(c.generated_at):c.gerado,assinado:c.signed_at?fmtDate(c.signed_at):c.assinado,escopo:c.scope||c.escopo,valor:c.valor||c.value});
-const normDispute  = d=>({...d,order:d.order_id||d.order,desc:d.description||d.desc});
-const normReview   = r=>({...r,order:r.order_id||r.order,from:r.from_company||r.from});
-const normNotif    = n=>({...n,desc:n.descricao||n.desc,lida:n.read!==undefined?n.read:n.lida});
-const normNDA      = n=>({...n,demanda:n.demand_id||n.demanda,assinado:n.signed_at?(n.signed_at.includes&&n.signed_at.includes("/")?n.signed_at:fmtDate(n.signed_at)):n.assinado});
 const APP_SSE_EVENTS=[
   "demand.created",
   "proposal.received",
