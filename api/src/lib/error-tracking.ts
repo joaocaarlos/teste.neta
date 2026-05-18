@@ -49,7 +49,7 @@ export function addBreadcrumb(opts: { category: string; message: string; data?: 
 export function captureException(err: unknown, req?: Request): void {
   if (!sentry) return;
   sentry.withScope((scope) => {
-    if (req?.id) scope.setTag("request_id", req.id);
+    if (req?.id) scope.setTag("request_id", String(req.id));
     if (req?.user?.userId) scope.setUser({ id: req.user.userId });
     if (req) {
       scope.setContext("request", {

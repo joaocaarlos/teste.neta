@@ -24,7 +24,7 @@ export function stripe(): StripeClient {
   }
   if (!stripeClient) {
     stripeClient = new Stripe(secretKey!, {
-      apiVersion: "2026-04-22.dahlia",
+      apiVersion: "2024-06-20",
     });
   }
   return stripeClient;

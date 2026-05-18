@@ -16,7 +16,7 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  const requestId = req.id;
+  const requestId = req.id != null ? String(req.id) : undefined;
   const log = req.log || logger;
 
   // Tentar parsear como erro de BD
