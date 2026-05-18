@@ -49,7 +49,7 @@ export function calcScore(inp: ScoreInput): ScoreResult {
 
   const dProc = norm(demand.process);
   const pProc = norm(proposal.process_match || "");
-  let processScore = dProc && pProc.includes(dProc) ? 25 : dProc.split(/\s+/).some((w) => w.length > 3 && pProc.includes(w)) ? 15 : 5;
+  const processScore = dProc && pProc.includes(dProc) ? 25 : dProc.split(/\s+/).some((w) => w.length > 3 && pProc.includes(w)) ? 15 : 5;
   total += processScore;
   breakdown.push({ criterion: "Processo compatível", weight: 25, earned: processScore, reason: processScore === 25 ? "match exato" : processScore === 15 ? "match parcial" : "sem match claro" });
 
@@ -60,13 +60,13 @@ export function calcScore(inp: ScoreInput): ScoreResult {
 
   const dUF = getUF(demand.location);
   const pUF = getUF(proposal.city);
-  let locScore = !dUF || !pUF ? 7 : dUF === pUF ? 15 : sameRegion(dUF, pUF) ? 8 : 4;
+  const locScore = !dUF || !pUF ? 7 : dUF === pUF ? 15 : sameRegion(dUF, pUF) ? 8 : 4;
   total += locScore;
   breakdown.push({ criterion: "Localização logística", weight: 15, earned: locScore, reason: dUF === pUF ? "mesma UF" : dUF && pUF ? `${pUF} → ${dUF}` : "UF não definida" });
 
   const dCert = norm(demand.cert_required);
   const pCert = norm(proposal.cert);
-  let certScore = !dCert ? 12 : pCert.includes(dCert) ? 15 : pCert ? 6 : 0;
+  const certScore = !dCert ? 12 : pCert.includes(dCert) ? 15 : pCert ? 6 : 0;
   total += certScore;
   breakdown.push({ criterion: "Certificação", weight: 15, earned: certScore, reason: !dCert ? "não exigida" : pCert.includes(dCert) ? "atende" : pCert ? "outras certs" : "sem cert" });
 
@@ -76,7 +76,7 @@ export function calcScore(inp: ScoreInput): ScoreResult {
   breakdown.push({ criterion: "Avaliação histórica", weight: 10, earned: ratingScore, reason: `${rating}★` });
 
   const days = proposal.days ?? 30;
-  let prazoScore = days <= 10 ? 10 : days <= 20 ? 7 : days <= 30 ? 4 : 1;
+  const prazoScore = days <= 10 ? 10 : days <= 20 ? 7 : days <= 30 ? 4 : 1;
   total += prazoScore;
   breakdown.push({ criterion: "Prazo", weight: 10, earned: prazoScore, reason: `${days} dias` });
 

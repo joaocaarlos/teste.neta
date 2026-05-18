@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
-    "migrate": "ts-node src/lib/migrations.ts"
+    "migrate": "ts-node src/lib/migrations.ts",
+    "lint": "eslint src --ext .ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
@@ -67,6 +68,9 @@
     "supertest": "^7.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0"
   }
 }

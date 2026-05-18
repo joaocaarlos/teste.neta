@@ -53,16 +53,17 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_files_entity ON uploaded_files(entity_ty
 
 CREATE TABLE IF NOT EXISTS security_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  severity TEXT NOT NULL DEFAULT 'info',
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  email TEXT,
-  ip TEXT,
+  email_hash TEXT,
+  ip INET,
   user_agent TEXT,
   metadata JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(type);
+CREATE INDEX IF NOT EXISTS idx_security_events_event_type ON security_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_security_events_user_id ON security_events(user_id);
 CREATE INDEX IF NOT EXISTS idx_security_events_created_at ON security_events(created_at DESC);
 

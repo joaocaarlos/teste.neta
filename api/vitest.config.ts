@@ -7,11 +7,7 @@ export default defineConfig({
     setupFiles: ["./src/__tests__/setup.ts"],
     include: ["src/__tests__/**/*.test.ts", "tests/**/*.test.ts"],
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    singleFork: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html", "json-summary"],

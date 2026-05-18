@@ -61,15 +61,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Frontend deps
         run: npm ci
-        working-directory: frontend
 
       - name: Type-check Frontend
         run: npx tsc --noEmit
-        working-directory: frontend
 
   # ────────────────────────────────────────────────────────────
   unit-tests:
@@ -89,7 +87,7 @@ jobs:
         working-directory: api
 
       - name: Run unit + integration tests with coverage
-        run: npx vitest run --reporter=verbose --coverage tests
+        run: npx vitest run --reporter=verbose
         working-directory: api
         env:
           NODE_ENV: test
@@ -147,7 +145,7 @@ jobs:
         working-directory: api
 
       - name: Run integration tests (against real Postgres + Redis)
-        run: npx vitest run --reporter=verbose --coverage tests
+        run: npx vitest run --reporter=verbose
         working-directory: api
         env:
           NODE_ENV: test
@@ -245,15 +243,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Frontend deps
         run: npm ci
-        working-directory: frontend
 
       - name: Build Frontend
         run: npm run build
-        working-directory: frontend
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3001' }}
 
@@ -261,7 +257,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: dist/
           retention-days: 7
 
   # ────────────────────────────────────────────────────────────
@@ -287,7 +283,7 @@ jobs:
       - name: Build Frontend image (no push)
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend
+          context: .
           push: false
           tags: capacity-frontend:${{ github.sha }}
           cache-from: type=gha
