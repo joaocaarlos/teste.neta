@@ -37,6 +37,8 @@ const MachinesPage        = lazy(() => import("../features/machines/MachinesPage
 const CalendarPage        = lazy(() => import("../features/calendar/CalendarPage").then(m => ({ default: m.CalendarPage })));
 const DisputeList         = lazy(() => import("../features/disputes/DisputeList"));
 const ExecutiveDashboard  = lazy(() => import("../features/admin/ExecutiveDashboard").then(m => ({ default: m.ExecutiveDashboard })));
+const DashboardPage       = lazy(() => import("../features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
+const DemandsPage         = lazy(() => import("../features/demands/DemandsPage").then(m => ({ default: m.DemandsPage })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -99,8 +101,8 @@ const router = createBrowserRouter([
   { path: "/auth/forgot-password",  element: <LegacyApp /> },
   { path: "/auth/reset-password",   element: <LegacyApp /> },
   { path: "/auth/verify-email",     element: <LegacyApp /> },
-  { path: "/dashboard/*",           element: <LegacyApp /> },
-  { path: "/demandas/*",            element: <LegacyApp /> },
+  { path: "/dashboard/*",           element: <RouteWrapper><DashboardPage /></RouteWrapper> },
+  { path: "/demandas/*",            element: <RouteWrapper><DemandsPage /></RouteWrapper> },
   { path: "/propostas/*",           element: <LegacyApp /> },
   { path: "/pedidos/*",             element: <LegacyApp /> },
   { path: "/contratos/*",           element: <LegacyApp /> },
