@@ -43,6 +43,10 @@ describe("DB", () => {
 
 // ─── getCookie ────────────────────────────────────────────────────────────────
 describe("getCookie", () => {
+  beforeEach(() => {
+    Object.defineProperty(document, "cookie", { writable: true, value: "" });
+  });
+
   it("retorna valor do cookie existente", () => {
     Object.defineProperty(document, "cookie", {
       writable: true,
@@ -84,6 +88,16 @@ describe("clearLegacySession", () => {
     clearLegacySession();
     expect(localStorage.getItem("cap4_jwt")).toBeNull();
     expect(localStorage.getItem("cap4_session")).toBeNull();
+  });
+
+  it("remove todas as chaves cap4_*", () => {
+    localStorage.setItem("cap4_prefs", "{}");
+    localStorage.setItem("cap4_theme", "dark");
+    localStorage.setItem("other_key", "keep");
+    clearLegacySession();
+    expect(localStorage.getItem("cap4_prefs")).toBeNull();
+    expect(localStorage.getItem("cap4_theme")).toBeNull();
+    expect(localStorage.getItem("other_key")).toBe("keep");
   });
 });
 

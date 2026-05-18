@@ -53,20 +53,20 @@ export const fmtBRL = (v: number): string => {
  * Clear legacy session data
  */
 export function clearLegacySession(): void {
-  localStorage.removeItem("cap4_jwt");
-  DB.del("session");
+  Object.keys(localStorage)
+    .filter((k) => k.startsWith("cap4_"))
+    .forEach((k) => localStorage.removeItem(k));
 }
 
-/**
- * Normalize user data from API response
- */
-export function normalizeSessionUser(user: any): any {
+export function normalizeSessionUser(
+  user: Record<string, unknown> | null
+): Record<string, unknown> | null {
   if (!user) return null;
   return {
     ...user,
-    companyStatus: user.companyStatus || user.company_status,
-    company_id: user.company_id || user.companyId,
-    loginAt: user.loginAt || new Date().toISOString(),
+    companyStatus: user.companyStatus ?? user.company_status,
+    company_id:    user.company_id    ?? user.companyId,
+    loginAt:       user.loginAt       ?? new Date().toISOString(),
   };
 }
 

@@ -49,7 +49,7 @@ import {
   normDemand, normOrder, normProposal, normTxn, normContract,
   normDispute, normReview, normNotif, normNDA,
 } from "../utils";
-// Usado pelas 3 chamadas fetch diretas no AuthProvider (login/register/me)
+// AuthProvider usa fetch direto (não apiFetch) para login/register/me
 const API_BASE = "/api";
 
 const APP_SSE_EVENTS=[

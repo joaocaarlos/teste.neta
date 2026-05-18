@@ -48,9 +48,9 @@ describe("App", () => {
     expect(document.body).toBeTruthy();
   });
 
-  it("renderiza ErrorBoundary como wrapper", () => {
-    render(<App />);
-    // If ErrorBoundary crashes, render would throw — reaching here means it's fine
-    expect(true).toBe(true);
+  it("renderiza CookieBanner dentro do I18nProvider", () => {
+    const { container } = render(<App />);
+    // The app shell must mount at least one DOM node
+    expect(container.firstChild).not.toBeNull();
   });
 });

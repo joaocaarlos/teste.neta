@@ -13,9 +13,9 @@ function mockFetch(body: unknown, status = 200) {
 }
 
 beforeEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   Object.defineProperty(document, "cookie", { writable: true, value: "" });
-  localStorage.clear();
 });
 
 // ─── apiFetch ────────────────────────────────────────────────────────────────
