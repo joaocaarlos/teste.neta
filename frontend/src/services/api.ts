@@ -4,8 +4,11 @@
 import { getCookie, clearLegacySession } from "../utils";
 
 const API_BASE = "/api";
-const TOKEN_KEY = "cap4_jwt";
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string; status: number };
 
 export type RequestOptions = RequestInit & {
   headers?: Record<string, string>;
@@ -49,23 +52,35 @@ export async function apiFetch(
 }
 
 /**
- * GET request helper - automatically handles JSON and error display
+ * GET request helper — returns a typed ApiResult.
  */
-export async function apiGet<T = any>(path: string): Promise<T[]> {
+export async function apiGet<T = unknown>(path: string): Promise<ApiResult<T>> {
   try {
     const r = await apiFetch(path);
     const json = await r.json().catch(() => null);
 
     if (!r.ok) {
-      console.error(`API Error: ${path}`, json?.error || `Failed to fetch`);
-      return [];
+      return { ok: false, error: json?.error ?? "Request failed", status: r.status };
     }
 
-    return Array.isArray(json?.data) ? json.data : json;
+    const data: T = json?.data !== undefined ? json.data : json;
+    return { ok: true, data };
   } catch (e) {
-    console.error(`API Connection Error: ${path}`, e);
+    return { ok: false, error: (e as Error).message ?? "Network error", status: 0 };
+  }
+}
+
+/**
+ * GET list helper — unwraps an array result, returning [] on failure.
+ * Use when the caller only needs the list and doesn't need to distinguish error states.
+ */
+export async function apiGetList<T = unknown>(path: string): Promise<T[]> {
+  const result = await apiGet<T[]>(path);
+  if (!result.ok) {
+    console.error(`API Error [${path}]:`, result.error);
     return [];
   }
+  return Array.isArray(result.data) ? result.data : [];
 }
 
 /**

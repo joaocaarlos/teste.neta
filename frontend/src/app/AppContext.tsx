@@ -2,7 +2,7 @@
  * Application state context
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { apiGet, apiFetch } from "../services/api";
+import { apiGetList, apiFetch } from "../services/api";
 import {
   normDemand,
   normOrder,
@@ -54,19 +54,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAppLoading(true);
 
     Promise.all([
-      apiGet("/demands"),
-      apiGet("/orders"),
-      apiGet("/machines"),
-      apiGet("/companies"),
-      apiGet("/contracts"),
-      apiGet("/ndas"),
-      apiGet("/proposals"),
-      apiGet("/transactions"),
-      apiGet("/disputes"),
-      apiGet("/reviews"),
-      apiGet("/recurring"),
-      apiGet("/notifications"),
-      role === "admin" ? apiGet("/audit") : Promise.resolve([]),
+      apiGetList("/demands"),
+      apiGetList("/orders"),
+      apiGetList("/machines"),
+      apiGetList("/companies"),
+      apiGetList("/contracts"),
+      apiGetList("/ndas"),
+      apiGetList("/proposals"),
+      apiGetList("/transactions"),
+      apiGetList("/disputes"),
+      apiGetList("/reviews"),
+      apiGetList("/recurring"),
+      apiGetList("/notifications"),
+      role === "admin" ? apiGetList("/audit") : Promise.resolve([]),
     ])
       .then(
         ([

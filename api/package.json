@@ -12,7 +12,9 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit",
-    "migrate": "ts-node src/lib/migrations.ts",
+    "db:migrate": "ts-node -e \"require('./src/lib/migrations').runMigrations().then(() => process.exit(0)).catch(() => process.exit(1))\"",
+    "db:rollback": "ts-node -e \"require('./src/lib/migrations').rollbackMigrations(Number(process.env.STEPS||1)).then(() => process.exit(0)).catch(() => process.exit(1))\"",
+    "migrate": "npm run db:migrate",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

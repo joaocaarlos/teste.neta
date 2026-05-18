@@ -64,6 +64,34 @@ export class PaginatedResponse<T> extends ApiResponse<T[]> {
   }
 }
 
+import { Response } from "express";
+
+/**
+ * Send a successful JSON response.
+ */
+export function ok<T>(res: Response, data: T, message?: string, status = 200): void {
+  res.status(status).json(new ApiResponse(data, message));
+}
+
+/**
+ * Send an error JSON response.
+ */
+export function fail(
+  res: Response,
+  error: string,
+  code = "ERROR",
+  status = 400,
+  detail?: Record<string, unknown>
+): void {
+  const body: ApiErrorResponse = {
+    error,
+    code,
+    timestamp: new Date().toISOString(),
+    ...(detail ? { detail } : {}),
+  };
+  res.status(status).json(body);
+}
+
 /**
  * Type guard para ApplicationError
  */

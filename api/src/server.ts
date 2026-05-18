@@ -1,6 +1,3 @@
-// Entry point: re-exports app for tests, delegates startup to server.ts
-export { app as default, app, readinessChecks } from "./app";
-
 import "dotenv/config";
 import { app } from "./app";
 import { startCron } from "./cron";
@@ -22,9 +19,7 @@ async function start(): Promise<void> {
   });
 }
 
-if (process.env.NODE_ENV !== "test") {
-  void start().catch((err) => {
-    logger.fatal({ err }, "CapaCity API failed to start");
-    process.exit(1);
-  });
-}
+void start().catch((err) => {
+  logger.fatal({ err }, "CapaCity API failed to start");
+  process.exit(1);
+});
