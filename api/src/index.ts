@@ -145,15 +145,28 @@ function protectMetrics(req: Request, res: Response, next: NextFunction): void {
 
 app.get("/metrics", protectMetrics, metricsHandler);
 
-app.use(
-  "/docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customSiteTitle: "CapaCity API Docs",
-    swaggerOptions: { persistAuthorization: true },
-  })
-);
-app.get("/docs.json", (_req, res) => res.json(swaggerSpec));
+const docsEnabled =
+  process.env.NODE_ENV !== "production" ||
+  process.env.ENABLE_API_DOCS === "true";
+
+if (docsEnabled) {
+  app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: "CapaCity API Docs",
+      swaggerOptions: { persistAuthorization: true },
+    })
+  );
+  app.get("/docs.json", (_req, res) => res.json(swaggerSpec));
+} else {
+  app.use("/docs", (_req: Request, res: Response) => {
+    res.status(403).json({ error: "Documentação desativada em produção.", code: "DOCS_DISABLED" });
+  });
+  app.get("/docs.json", (_req: Request, res: Response) => {
+    res.status(403).json({ error: "Documentação desativada em produção.", code: "DOCS_DISABLED" });
+  });
+}
 
 async function readinessChecks(): Promise<Record<string, { ok: boolean; detail?: unknown }>> {
   const checks: Record<string, { ok: boolean; detail?: unknown }> = {};
