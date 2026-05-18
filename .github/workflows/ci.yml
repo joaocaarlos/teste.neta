@@ -61,13 +61,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Frontend deps
         run: npm ci
+        working-directory: frontend
 
       - name: Type-check Frontend
         run: npx tsc --noEmit
+        working-directory: frontend
 
   # ────────────────────────────────────────────────────────────
   unit-tests:
@@ -243,13 +245,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Frontend deps
         run: npm ci
+        working-directory: frontend
 
       - name: Build Frontend
         run: npm run build
+        working-directory: frontend
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL || 'http://localhost:3001' }}
 
@@ -257,7 +261,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: dist/
+          path: frontend/dist/
           retention-days: 7
 
   # ────────────────────────────────────────────────────────────
@@ -283,7 +287,7 @@ jobs:
       - name: Build Frontend image (no push)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./frontend
           push: false
           tags: capacity-frontend:${{ github.sha }}
           cache-from: type=gha
