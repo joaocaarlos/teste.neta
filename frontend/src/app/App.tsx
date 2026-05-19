@@ -42,6 +42,13 @@ const DemandsPage         = lazy(() => import("../features/demands/DemandsPage")
 const ProposalList        = lazy(() => import("../features/proposals/ProposalList"));
 const ContractList        = lazy(() => import("../features/contracts/ContractList"));
 const DemandWizard        = lazy(() => import("../features/demands/DemandWizard").then(m => ({ default: m.DemandWizard })));
+const OrdersPage          = lazy(() => import("../features/orders/OrdersPage").then(m => ({ default: m.OrdersPage })));
+const FinancialPage       = lazy(() => import("../features/financial/FinancialPage").then(m => ({ default: m.FinancialPage })));
+const SuppliersPage       = lazy(() => import("../features/suppliers/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
+const LoginPage           = lazy(() => import("../features/auth/LoginPage").then(m => ({ default: m.LoginPage })));
+const SettingsPage        = lazy(() => import("../features/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const VerificationPage    = lazy(() => import("../features/verification/VerificationPage").then(m => ({ default: m.VerificationPage })));
+const AdminVerificationPage = lazy(() => import("../features/verification/AdminVerificationPage").then(m => ({ default: m.AdminVerificationPage })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -94,7 +101,7 @@ const router = createBrowserRouter([
 
   // Legacy app handles all authenticated + auth routes
   { path: "/",                      element: <LegacyApp /> },
-  { path: "/login",                 element: <LegacyApp /> },
+  { path: "/login",                 element: <RouteWrapper><LoginPage /></RouteWrapper> },
   { path: "/cadastro",              element: <LegacyApp /> },
   { path: "/register",              element: <LegacyApp /> },
   { path: "/forgot",                element: <LegacyApp /> },
@@ -107,26 +114,26 @@ const router = createBrowserRouter([
   { path: "/dashboard/*",           element: <RouteWrapper><DashboardPage /></RouteWrapper> },
   { path: "/demandas/*",            element: <RouteWrapper><DemandsPage /></RouteWrapper> },
   { path: "/propostas/*",           element: <RouteWrapper><ProposalList /></RouteWrapper> },
-  { path: "/pedidos/*",             element: <LegacyApp /> },
+  { path: "/pedidos/*",             element: <RouteWrapper><OrdersPage /></RouteWrapper> },
   { path: "/contratos/*",           element: <RouteWrapper><ContractList /></RouteWrapper> },
   { path: "/maquinas/*",            element: <RouteWrapper><MachinesPage /></RouteWrapper> },
   { path: "/calendario/*",          element: <RouteWrapper><CalendarPage /></RouteWrapper> },
   { path: "/chat/*",                element: <RouteWrapper><MessagesPage /></RouteWrapper> },
-  { path: "/financeiro/*",          element: <LegacyApp /> },
+  { path: "/financeiro/*",          element: <RouteWrapper><FinancialPage /></RouteWrapper> },
   { path: "/disputas/*",            element: <RouteWrapper><DisputeList /></RouteWrapper> },
   { path: "/avaliacoes/*",          element: <LegacyApp /> },
   { path: "/qualidade/*",           element: <LegacyApp /> },
-  { path: "/verificacao/*",         element: <LegacyApp /> },
-  { path: "/verificacao-admin/*",   element: <LegacyApp /> },
+  { path: "/verificacao/*",         element: <RouteWrapper><VerificationPage /></RouteWrapper> },
+  { path: "/verificacao-admin/*",   element: <RouteWrapper><AdminVerificationPage /></RouteWrapper> },
   { path: "/empresas/*",            element: <LegacyApp /> },
   { path: "/auditoria/*",           element: <LegacyApp /> },
-  { path: "/config/*",              element: <LegacyApp /> },
-  { path: "/configuracoes/*",       element: <LegacyApp /> },
+  { path: "/config/*",              element: <RouteWrapper><SettingsPage /></RouteWrapper> },
+  { path: "/configuracoes/*",       element: <RouteWrapper><SettingsPage /></RouteWrapper> },
   { path: "/admin/*",               element: <RouteWrapper><ExecutiveDashboard /></RouteWrapper> },
   { path: "/contratos-recorrentes/*", element: <LegacyApp /> },
   { path: "/nda/*",                 element: <LegacyApp /> },
   { path: "/comparar/*",            element: <LegacyApp /> },
-  { path: "/fornecedores/*",        element: <LegacyApp /> },
+  { path: "/fornecedores/*",        element: <RouteWrapper><SuppliersPage /></RouteWrapper> },
   { path: "/nova-demanda/*",        element: <RouteWrapper><DemandWizard onPublish={async () => { window.location.href = "/demandas"; }} onCancel={() => window.history.back()} /></RouteWrapper> },
   { path: "/acompanhamento/*",      element: <LegacyApp /> },
 
