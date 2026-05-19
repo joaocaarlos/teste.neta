@@ -39,6 +39,9 @@ const DisputeList         = lazy(() => import("../features/disputes/DisputeList"
 const ExecutiveDashboard  = lazy(() => import("../features/admin/ExecutiveDashboard").then(m => ({ default: m.ExecutiveDashboard })));
 const DashboardPage       = lazy(() => import("../features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
 const DemandsPage         = lazy(() => import("../features/demands/DemandsPage").then(m => ({ default: m.DemandsPage })));
+const ProposalList        = lazy(() => import("../features/proposals/ProposalList"));
+const ContractList        = lazy(() => import("../features/contracts/ContractList"));
+const DemandWizard        = lazy(() => import("../features/demands/DemandWizard").then(m => ({ default: m.DemandWizard })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -103,9 +106,9 @@ const router = createBrowserRouter([
   { path: "/auth/verify-email",     element: <LegacyApp /> },
   { path: "/dashboard/*",           element: <RouteWrapper><DashboardPage /></RouteWrapper> },
   { path: "/demandas/*",            element: <RouteWrapper><DemandsPage /></RouteWrapper> },
-  { path: "/propostas/*",           element: <LegacyApp /> },
+  { path: "/propostas/*",           element: <RouteWrapper><ProposalList /></RouteWrapper> },
   { path: "/pedidos/*",             element: <LegacyApp /> },
-  { path: "/contratos/*",           element: <LegacyApp /> },
+  { path: "/contratos/*",           element: <RouteWrapper><ContractList /></RouteWrapper> },
   { path: "/maquinas/*",            element: <RouteWrapper><MachinesPage /></RouteWrapper> },
   { path: "/calendario/*",          element: <RouteWrapper><CalendarPage /></RouteWrapper> },
   { path: "/chat/*",                element: <RouteWrapper><MessagesPage /></RouteWrapper> },
@@ -124,7 +127,7 @@ const router = createBrowserRouter([
   { path: "/nda/*",                 element: <LegacyApp /> },
   { path: "/comparar/*",            element: <LegacyApp /> },
   { path: "/fornecedores/*",        element: <LegacyApp /> },
-  { path: "/nova-demanda/*",        element: <LegacyApp /> },
+  { path: "/nova-demanda/*",        element: <RouteWrapper><DemandWizard onPublish={async () => { window.location.href = "/demandas"; }} onCancel={() => window.history.back()} /></RouteWrapper> },
   { path: "/acompanhamento/*",      element: <LegacyApp /> },
 
   // 404 fallback
