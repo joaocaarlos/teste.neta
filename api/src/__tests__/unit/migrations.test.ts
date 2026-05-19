@@ -31,6 +31,7 @@ function resetClientMock(overrides: Partial<{ query: typeof mockClientQuery; row
   mockClientRelease.mockReset();
   mockClientQuery.mockReset();
   mockPoolConnect.mockReset();
+  mockPoolQuery.mockReset();
 
   // Default: all client.query calls succeed and return empty rows
   mockClientQuery.mockResolvedValue({ rows: [], rowCount: overrides.rowCount ?? 0 });
