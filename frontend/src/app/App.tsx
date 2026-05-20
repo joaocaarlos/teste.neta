@@ -46,6 +46,10 @@ const OrdersPage          = lazy(() => import("../features/orders/OrdersPage").t
 const FinancialPage       = lazy(() => import("../features/financial/FinancialPage").then(m => ({ default: m.FinancialPage })));
 const SuppliersPage       = lazy(() => import("../features/suppliers/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
 const LoginPage           = lazy(() => import("../features/auth/LoginPage").then(m => ({ default: m.LoginPage })));
+const RegisterPage        = lazy(() => import("../features/auth/RegisterPage").then(m => ({ default: m.RegisterPage })));
+const ForgotPasswordPage  = lazy(() => import("../features/auth/ForgotPasswordPage").then(m => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage   = lazy(() => import("../features/auth/ResetPasswordPage").then(m => ({ default: m.ResetPasswordPage })));
+const VerifyEmailPage     = lazy(() => import("../features/auth/VerifyEmailPage").then(m => ({ default: m.VerifyEmailPage })));
 const SettingsPage        = lazy(() => import("../features/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const VerificationPage    = lazy(() => import("../features/verification/VerificationPage").then(m => ({ default: m.VerificationPage })));
 const AdminVerificationPage = lazy(() => import("../features/verification/AdminVerificationPage").then(m => ({ default: m.AdminVerificationPage })));
@@ -102,15 +106,15 @@ const router = createBrowserRouter([
   // Legacy app handles all authenticated + auth routes
   { path: "/",                      element: <LegacyApp /> },
   { path: "/login",                 element: <RouteWrapper><LoginPage /></RouteWrapper> },
-  { path: "/cadastro",              element: <LegacyApp /> },
-  { path: "/register",              element: <LegacyApp /> },
-  { path: "/forgot",                element: <LegacyApp /> },
-  { path: "/forgot-password",       element: <LegacyApp /> },
-  { path: "/reset-password",        element: <LegacyApp /> },
-  { path: "/verify-email",          element: <LegacyApp /> },
-  { path: "/auth/forgot-password",  element: <LegacyApp /> },
-  { path: "/auth/reset-password",   element: <LegacyApp /> },
-  { path: "/auth/verify-email",     element: <LegacyApp /> },
+  { path: "/cadastro",              element: <RouteWrapper><RegisterPage /></RouteWrapper> },
+  { path: "/register",              element: <RouteWrapper><RegisterPage /></RouteWrapper> },
+  { path: "/forgot",                element: <RouteWrapper><ForgotPasswordPage /></RouteWrapper> },
+  { path: "/forgot-password",       element: <RouteWrapper><ForgotPasswordPage /></RouteWrapper> },
+  { path: "/reset-password",        element: <RouteWrapper><ResetPasswordPage /></RouteWrapper> },
+  { path: "/verify-email",          element: <RouteWrapper><VerifyEmailPage /></RouteWrapper> },
+  { path: "/auth/forgot-password",  element: <RouteWrapper><ForgotPasswordPage /></RouteWrapper> },
+  { path: "/auth/reset-password",   element: <RouteWrapper><ResetPasswordPage /></RouteWrapper> },
+  { path: "/auth/verify-email",     element: <RouteWrapper><VerifyEmailPage /></RouteWrapper> },
   { path: "/dashboard/*",           element: <RouteWrapper><DashboardPage /></RouteWrapper> },
   { path: "/demandas/*",            element: <RouteWrapper><DemandsPage /></RouteWrapper> },
   { path: "/propostas/*",           element: <RouteWrapper><ProposalList /></RouteWrapper> },
