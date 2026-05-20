@@ -7,8 +7,6 @@
  *   - <CookieBanner>      consentimento LGPD para visitantes
  *   - Marketing routes    /precos, /como-funciona, /privacidade, /termos
  *   - 404 page            qualquer rota desconhecida não autenticada
- *   - <LegacyApp>         o app completo (landing + auth + dashboard)
- *                         enquanto extraímos peça por peça para features/.
  */
 
 import { Suspense, lazy, useEffect } from "react";
@@ -27,9 +25,6 @@ const HowItWorksPage  = lazy(() => import("../features/marketing/HowItWorksPage"
 const PrivacyPage     = lazy(() => import("../features/marketing/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
 const TermsPage       = lazy(() => import("../features/marketing/TermsPage").then(m => ({ default: m.TermsPage })));
 const StatusPage      = lazy(() => import("../features/status/StatusPage").then(m => ({ default: m.StatusPage })));
-
-// Legacy app — todo o resto. Lazy para code-splitting.
-const LegacyApp = lazy(() => import("../legacy/LegacyApp"));
 
 // Extracted landing / reviews / order-tracking pages
 const LandingPage         = lazy(() => import("../features/landing/LandingPage").then(m => ({ default: m.LandingPage })));
@@ -63,6 +58,7 @@ const CompaniesPage       = lazy(() => import("../features/companies/CompaniesPa
 const AuditPage           = lazy(() => import("../features/audit/AuditPage").then(m => ({ default: m.AuditPage })));
 const ProposalComparePage = lazy(() => import("../features/proposals/ProposalComparePage").then(m => ({ default: m.ProposalComparePage })));
 const NDAPage             = lazy(() => import("../features/ndas/NDAPage").then(m => ({ default: m.NDAPage })));
+const RecurringContractsPage = lazy(() => import("../features/recurring/RecurringContractsPage").then(m => ({ default: m.RecurringContractsPage })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -144,7 +140,7 @@ const router = createBrowserRouter([
   { path: "/config/*",              element: <RouteWrapper><SettingsPage /></RouteWrapper> },
   { path: "/configuracoes/*",       element: <RouteWrapper><SettingsPage /></RouteWrapper> },
   { path: "/admin/*",               element: <RouteWrapper><ExecutiveDashboard /></RouteWrapper> },
-  { path: "/contratos-recorrentes/*", element: <LegacyApp /> },
+  { path: "/contratos-recorrentes/*", element: <RouteWrapper><RecurringContractsPage /></RouteWrapper> },
   { path: "/nda/*",                 element: <RouteWrapper><NDAPage /></RouteWrapper> },
   { path: "/comparar/*",            element: <RouteWrapper><ProposalComparePage /></RouteWrapper> },
   { path: "/fornecedores/*",        element: <RouteWrapper><SuppliersPage /></RouteWrapper> },
