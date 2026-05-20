@@ -14,6 +14,7 @@ import { initErrorTracking } from "./lib/error-tracking";
 import { pingRedis } from "./lib/redis";
 import { ensureUploadStorageReady } from "./lib/upload";
 import { metricsHandler, metricsMiddleware } from "./lib/metrics";
+import { requestMetrics } from "./middleware/requestMetrics";
 import { env } from "./config/env";
 
 import v1Routes          from "./routes/v1";
@@ -101,6 +102,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(requestLogMiddleware);
+app.use(requestMetrics);
 
 // Stripe webhook must come before express.json() to receive raw body
 app.post("/api/transactions/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhook);
@@ -149,25 +151,38 @@ if (docsEnabled) {
   });
 }
 
-export async function readinessChecks(): Promise<Record<string, { ok: boolean; detail?: unknown }>> {
-  const checks: Record<string, { ok: boolean; detail?: unknown }> = {};
+export interface ServiceCheck {
+  ok: boolean;
+  latencyMs?: number;
+  detail?: unknown;
+}
 
+export async function readinessChecks(): Promise<Record<string, ServiceCheck>> {
+  const checks: Record<string, ServiceCheck> = {};
+
+  // DB check with latency
+  const dbStart = Date.now();
   try {
     await pool.query("SELECT 1");
+    const latencyMs = Date.now() - dbStart;
     checks.db = {
       ok: true,
+      latencyMs,
       detail: { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount },
     };
   } catch (err) {
-    checks.db = { ok: false, detail: (err as Error).message };
+    checks.db = { ok: false, latencyMs: Date.now() - dbStart, detail: (err as Error).message };
   }
 
+  // Redis check with latency
+  const redisStart = Date.now();
   try {
-    checks.redis = { ok: (await pingRedis()) === "PONG" };
+    checks.redis = { ok: (await pingRedis()) === "PONG", latencyMs: Date.now() - redisStart };
   } catch (err) {
-    checks.redis = { ok: false, detail: (err as Error).message };
+    checks.redis = { ok: false, latencyMs: Date.now() - redisStart, detail: (err as Error).message };
   }
 
+  // Sequences check
   try {
     const requiredSequences = [
       "seq_demand_id", "seq_proposal_id", "seq_order_id", "seq_contract_id",
@@ -184,6 +199,7 @@ export async function readinessChecks(): Promise<Record<string, { ok: boolean; d
     checks.sequences = { ok: false, detail: (err as Error).message };
   }
 
+  // Migrations check — also surfaces lastMigration at top level via detail
   try {
     const { rows } = await pool.query<{ id: string; applied_at: string }>(
       `SELECT id, applied_at FROM schema_migrations ORDER BY applied_at DESC LIMIT 1`
@@ -193,6 +209,7 @@ export async function readinessChecks(): Promise<Record<string, { ok: boolean; d
     checks.migrations = { ok: false, detail: (err as Error).message };
   }
 
+  // Storage check
   try {
     await ensureUploadStorageReady();
     checks.uploads = { ok: true };
@@ -210,7 +227,28 @@ app.get("/health/live", (_req, res) => {
 app.get(["/health", "/health/ready"], async (_req, res) => {
   const checks = await readinessChecks();
   const ok = Object.values(checks).every((c) => c.ok);
-  res.status(ok ? 200 : 503).json({ status: ok ? "ok" : "error", checks, ts: new Date().toISOString() });
+
+  const mem = process.memoryUsage();
+  const toMB = (b: number) => `${Math.round(b / 1024 / 1024)}MB`;
+
+  // Extract lastMigration for top-level convenience
+  const migDetail = checks.migrations?.detail as { id?: string; applied_at?: string } | undefined;
+  const lastMigration = migDetail?.id ?? null;
+
+  res.status(ok ? 200 : 503).json({
+    status: ok ? "ok" : "error",
+    version: process.env.npm_package_version || process.env.GIT_SHA || "dev",
+    uptime: Math.floor(process.uptime()),
+    memory: {
+      heapUsed: toMB(mem.heapUsed),
+      heapTotal: toMB(mem.heapTotal),
+      rss: toMB(mem.rss),
+      external: toMB(mem.external),
+    },
+    checks,
+    lastMigration,
+    ts: new Date().toISOString(),
+  });
 });
 
 // v1 routes mounted at /api/v1 (canonical) and /api (backward compat alias)

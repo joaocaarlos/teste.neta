@@ -57,6 +57,8 @@ export function errorHandler(
   if (statusCode >= 500) {
     captureException(err, req);
     void notifyServerError(err, req);
+    // Expose original error to requestMetrics middleware via res.locals
+    res.locals["err"] = err;
   }
 
   const response: ApiErrorResponse = {
