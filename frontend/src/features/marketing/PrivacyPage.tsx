@@ -121,9 +121,16 @@ export function PrivacyPage() {
           Para exercer qualquer direito ou tirar dúvidas, contate nosso DPO:
         </p>
         <p style={{ fontFamily: "var(--mono)", fontSize: 13 }}>
-          <strong>E-mail:</strong> dpo@capacity.com.br<br />
+          <strong>E-mail:</strong>{" "}
+          <a href="mailto:dpo@capacity.com.br" style={link}>dpo@capacity.com.br</a><br />
           <strong>Endereço:</strong> [a definir]<br />
-          <strong>Prazo de resposta:</strong> 15 dias úteis
+          <strong>Prazo de resposta:</strong> 15 dias úteis (conforme LGPD art. 19)
+        </p>
+        <p>
+          Usuários autenticados podem exercer seus direitos diretamente pela plataforma:{" "}
+          <a href="/configuracoes?tab=privacidade" style={link}>
+            Configurações → Privacidade
+          </a>.
         </p>
 
         <h2 style={h2}>9. Autoridade Nacional</h2>

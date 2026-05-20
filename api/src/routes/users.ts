@@ -7,6 +7,7 @@ import { authenticate, authorize } from "../middleware/auth";
 import { audit } from "../lib/audit";
 import { makeUploader, persistUpload } from "../lib/upload";
 import { validate } from "../lib/validators";
+import { logger } from "../lib/logger";
 
 const router = Router();
 const ROUNDS = Number(process.env.BCRYPT_ROUNDS) || 10;
@@ -46,6 +47,7 @@ router.get("/me", authenticate, async (req: Request, res: Response, next: NextFu
     const { rows } = await query(
       `SELECT u.id, u.email, u.role, u.name, u.cnpj, u.avatar, u.avatar_url,
               u.email_verified_at, u.last_login_at, u.created_at,
+              u.onboarding_completed, u.onboarding_completed_at,
               c.name AS company, c.id AS company_id, c.status AS company_status
        FROM users u
        LEFT JOIN companies c ON c.id = u.company_id
@@ -56,6 +58,38 @@ router.get("/me", authenticate, async (req: Request, res: Response, next: NextFu
     res.json(rows[0]);
   } catch (err) { next(err); }
 });
+
+// PATCH /api/users/me — update profile fields (onboarding_completed, etc.)
+router.patch(
+  "/me",
+  authenticate,
+  validate([
+    body("onboarding_completed").optional().isBoolean().withMessage("onboarding_completed deve ser boolean."),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { onboarding_completed } = req.body as { onboarding_completed?: boolean };
+
+      if (onboarding_completed === undefined) {
+        return res.status(400).json({ error: "Nenhum campo válido para atualizar." });
+      }
+
+      const { rows } = await query(
+        `UPDATE users
+            SET onboarding_completed = $1,
+                onboarding_completed_at = CASE WHEN $1 = TRUE THEN COALESCE(onboarding_completed_at, NOW()) ELSE onboarding_completed_at END
+          WHERE id = $2
+            AND deleted_at IS NULL
+          RETURNING id, email, role, name, cnpj, avatar, avatar_url,
+                    email_verified_at, last_login_at, onboarding_completed, onboarding_completed_at`,
+        [Boolean(onboarding_completed), req.user!.userId]
+      );
+
+      if (!rows[0]) return res.status(404).json({ error: "Usuario nao encontrado." });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
 
 // GET /api/users/me/data-export (LGPD Art. 18 portabilidade)
 router.get("/me/data-export", authenticate, async (req: Request, res: Response, next: NextFunction) => {
@@ -80,6 +114,201 @@ router.delete("/me", authenticate, async (req: Request, res: Response, next: Nex
     res.json({
       message: "Sua conta foi anonimizada conforme LGPD. Dados retidos apenas para obrigacao fiscal.",
       retention_note: "Registros financeiros sao mantidos por 5 anos conforme Receita Federal.",
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/users/me/data-export (LGPD Art. 18 — enfileira exportação)
+router.post("/me/data-export", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    logger.info({ userId }, "lgpd: data-export requested");
+
+    const { rows: userData } = await query(
+      `SELECT u.id, u.email, u.name, u.cnpj, u.role, u.created_at,
+              u.last_login_at, u.email_verified_at,
+              c.name AS company, c.cnpj AS company_cnpj
+       FROM users u
+       LEFT JOIN companies c ON c.id = u.company_id
+       WHERE u.id = $1`,
+      [userId]
+    );
+
+    const { rows: demands } = await query(
+      `SELECT id, title, status, category, budget, created_at FROM demands WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const { rows: proposals } = await query(
+      `SELECT id, demand_id, status, price, created_at FROM proposals WHERE company_id = (
+         SELECT company_id FROM users WHERE id = $1
+       ) ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const { rows: orders } = await query(
+      `SELECT id, status, total, created_at FROM orders WHERE demandante_id = $1 OR fornecedor_id = (
+         SELECT company_id FROM users WHERE id = $1
+       ) ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const { rows: contracts } = await query(
+      `SELECT id, status, value, created_at FROM contracts WHERE demandante_id = $1 OR fornecedor_id = (
+         SELECT company_id FROM users WHERE id = $1
+       ) ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const { rows: messages } = await query(
+      `SELECT id, content, created_at FROM messages WHERE sender_id = $1 ORDER BY created_at DESC LIMIT 500`,
+      [userId]
+    );
+
+    const { rows: consents } = await query(
+      `SELECT purpose, granted, created_at FROM lgpd_consents WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const exportData = {
+      exported_at: new Date().toISOString(),
+      user: userData[0] ?? null,
+      demands,
+      proposals,
+      orders,
+      contracts,
+      messages,
+      lgpd_consents: consents,
+    };
+
+    await audit(req, "Exportação de dados LGPD solicitada", "lgpd");
+    res.json({ message: "Exportação gerada com sucesso.", data: exportData });
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/users/me/lgpd/consent (LGPD Art. 8 — registra consentimento)
+router.post(
+  "/me/lgpd/consent",
+  authenticate,
+  validate([
+    body("purpose").isIn(["analytics", "marketing", "essential"]).withMessage("Finalidade inválida."),
+    body("granted").isBoolean().withMessage("Campo granted deve ser boolean."),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const { purpose, granted } = req.body as { purpose: string; granted: boolean };
+      const ip = req.ip ?? null;
+      const userAgent = req.get("user-agent") ?? null;
+
+      logger.info({ userId, purpose, granted }, "lgpd: consent recorded");
+
+      const { rows } = await query<{ id: string; purpose: string; granted: boolean; created_at: Date }>(
+        `INSERT INTO lgpd_consents (user_id, purpose, granted, ip, user_agent)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, purpose, granted, created_at`,
+        [userId, purpose, granted, ip, userAgent]
+      );
+
+      await audit(req, `Consentimento LGPD: ${purpose} = ${granted}`, "lgpd");
+      res.status(201).json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/v1/users/me/lgpd/consents (lista consentimentos do usuário)
+router.get("/me/lgpd/consents", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    logger.info({ userId }, "lgpd: consents listed");
+
+    const { rows } = await query(
+      `SELECT DISTINCT ON (purpose) id, purpose, granted, created_at
+       FROM lgpd_consents
+       WHERE user_id = $1
+       ORDER BY purpose, created_at DESC`,
+      [userId]
+    );
+
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// POST /api/v1/users/me/lgpd/request (LGPD Art. 18 — cria pedido de direito)
+router.post(
+  "/me/lgpd/request",
+  authenticate,
+  validate([
+    body("type")
+      .isIn(["access", "rectification", "deletion", "portability", "objection"])
+      .withMessage("Tipo inválido. Use: access, rectification, deletion, portability, objection."),
+    body("notes").optional().isString().isLength({ max: 2000 }).withMessage("Notas muito longas (máx. 2000 chars)."),
+  ]),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const { type, notes } = req.body as { type: string; notes?: string };
+
+      logger.info({ userId, type }, "lgpd: rights request created");
+
+      const { rows } = await query<{ id: string; type: string; status: string; created_at: Date }>(
+        `INSERT INTO lgpd_requests (user_id, type, notes)
+         VALUES ($1, $2, $3)
+         RETURNING id, type, status, created_at`,
+        [userId, type, notes ?? null]
+      );
+
+      await audit(req, `Pedido LGPD criado: ${type}`, "lgpd");
+      res.status(201).json(rows[0]);
+    } catch (err) { next(err); }
+  }
+);
+
+// GET /api/v1/users/me/lgpd/requests (lista pedidos do usuário)
+router.get("/me/lgpd/requests", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    logger.info({ userId }, "lgpd: requests listed");
+
+    const { rows } = await query(
+      `SELECT id, type, status, notes, completed_at, created_at
+       FROM lgpd_requests
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/v1/users/me (LGPD Art. 18 — solicita exclusão, agenda para 30 dias)
+// Note: overrides the stored-procedure version above with soft-delete approach
+router.delete("/me/schedule-deletion", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    logger.info({ userId }, "lgpd: account deletion scheduled");
+
+    const { rows } = await query(
+      `UPDATE users
+       SET deletion_requested_at = NOW(),
+           deletion_scheduled_at = NOW() + INTERVAL '30 days'
+       WHERE id = $1 AND deleted_at IS NULL AND deletion_requested_at IS NULL
+       RETURNING id, deletion_requested_at, deletion_scheduled_at`,
+      [userId]
+    );
+
+    if (!rows[0]) {
+      return res.status(400).json({
+        error: "Solicitação de exclusão já registrada ou conta não encontrada.",
+      });
+    }
+
+    await audit(req, "Exclusão de conta agendada (LGPD)", "lgpd");
+    res.json({
+      message: "Sua conta foi agendada para exclusão em 30 dias. Você pode cancelar entrando em contato com nosso DPO.",
+      deletion_requested_at: rows[0].deletion_requested_at,
+      deletion_scheduled_at: rows[0].deletion_scheduled_at,
     });
   } catch (err) { next(err); }
 });
