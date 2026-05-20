@@ -4,7 +4,7 @@
  * Inline styles only.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ClipboardList,
   Package,
@@ -14,11 +14,15 @@ import {
   Plus,
   ArrowRight,
   Activity,
+  AlertTriangle,
+  Clock,
+  XCircle,
 } from "lucide-react";
-import { apiGetList } from "../../services/api";
+import { apiGetList, apiFetch } from "../../services/api";
 import { normDemand, normOrder, normProposal, normNotif } from "../../utils";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAuth } from "../../app/AuthContext";
+import { OnboardingWizard } from "../onboarding/OnboardingWizard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -543,16 +547,124 @@ function RecentProposalsCard({
   );
 }
 
+// ─── KYC Banner types ─────────────────────────────────────────────────────────
+
+type KycOverallStatus = "incomplete" | "pending" | "approved" | "rejected";
+
+interface KycStatusResponse {
+  overall: KycOverallStatus;
+  missingDocs?: string[];
+  pendingDocs?: string[];
+  approvedDocs?: string[];
+  estimatedReviewTime?: string | null;
+  lastUpdated?: string | null;
+}
+
+// ─── KycBanner ────────────────────────────────────────────────────────────────
+
+function KycBanner({
+  status,
+  rejectionNote,
+}: {
+  status: KycOverallStatus | null;
+  rejectionNote?: string | null;
+}) {
+  if (!status || status === "approved") return null;
+
+  const configs: Record<
+    Exclude<KycOverallStatus, "approved">,
+    {
+      bg: string;
+      border: string;
+      color: string;
+      icon: React.ReactElement;
+      message: string;
+      actionLabel?: string;
+      actionHref?: string;
+    }
+  > = {
+    incomplete: {
+      bg: "var(--amber)12",
+      border: "var(--amber)40",
+      color: "var(--amber)",
+      icon: <AlertTriangle size={14} />,
+      message: "Complete a verificação da sua empresa para acessar todos os recursos.",
+      actionLabel: "Verificar agora",
+      actionHref: "/verificacao",
+    },
+    pending: {
+      bg: "var(--blue)12",
+      border: "var(--blue)40",
+      color: "var(--blue)",
+      icon: <Clock size={14} />,
+      message: "Documentos em análise — retorno em até 2 dias úteis.",
+    },
+    rejected: {
+      bg: "var(--red)12",
+      border: "var(--red)40",
+      color: "var(--red)",
+      icon: <XCircle size={14} />,
+      message: `Verificação reprovada${rejectionNote ? `: ${rejectionNote}` : ""}.`,
+      actionLabel: "Reenviar documentos",
+      actionHref: "/verificacao",
+    },
+  };
+
+  const cfg = configs[status as Exclude<KycOverallStatus, "approved">];
+  if (!cfg) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 16px",
+        background: cfg.bg,
+        border: `1px solid ${cfg.border}`,
+        color: cfg.color,
+        fontFamily: "var(--mono)",
+        fontSize: 11,
+        letterSpacing: ".04em",
+        marginBottom: 20,
+      }}
+    >
+      <span style={{ flexShrink: 0 }}>{cfg.icon}</span>
+      <span style={{ flex: 1 }}>{cfg.message}</span>
+      {cfg.actionLabel && cfg.actionHref && (
+        <a
+          href={cfg.actionHref}
+          style={{
+            color: cfg.color,
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: ".06em",
+            textDecoration: "underline",
+            flexShrink: 0,
+          }}
+        >
+          {cfg.actionLabel}
+        </a>
+      )}
+    </div>
+  );
+}
+
 // ─── DashboardPage ────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [demands, setDemands] = useState<DemandSummary[]>([]);
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [proposals, setProposals] = useState<ProposalSummary[]>([]);
   const [notifications, setNotifications] = useState<NotifSummary[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // KYC status for banner
+  const [kycStatus, setKycStatus] = useState<KycOverallStatus | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -585,6 +697,39 @@ export function DashboardPage() {
     };
   }, []);
 
+  // Fetch KYC status for the banner
+  useEffect(() => {
+    if (!user?.company_id && !user?.companyId) return;
+    let cancelled = false;
+    apiFetch("/v1/verification/status")
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { data?: KycStatusResponse };
+        const payload = data.data ?? (data as unknown as KycStatusResponse);
+        if (!cancelled && payload.overall) {
+          setKycStatus(payload.overall);
+        }
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.company_id, user?.companyId]);
+
+  // Show onboarding wizard for new users
+  useEffect(() => {
+    if (user && user.onboarding_completed !== true) {
+      setShowOnboarding(true);
+    }
+  }, [user]);
+
+  const handleOnboardingComplete = useCallback(() => {
+    setShowOnboarding(false);
+    updateUser({ onboarding_completed: true });
+  }, [updateUser]);
+
   const greeting = getGreeting();
   const unreadCount = notifications.filter((n) => !n.read).length;
   const activeDemands = demands.filter(
@@ -592,6 +737,12 @@ export function DashboardPage() {
   ).length;
 
   return (
+    <>
+      {/* ─── Onboarding wizard overlay ───────────────────────────────────── */}
+      {showOnboarding && (
+        <OnboardingWizard onComplete={handleOnboardingComplete} />
+      )}
+
     <div
       style={{
         padding: "28px 32px",
@@ -600,6 +751,9 @@ export function DashboardPage() {
         fontFamily: "var(--body)",
       }}
     >
+      {/* ─── KYC status banner ───────────────────────────────────────────── */}
+      <KycBanner status={kycStatus} />
+
       {/* ─── Header ──────────────────────────────────────────────────────── */}
       <div
         style={{
@@ -764,6 +918,7 @@ export function DashboardPage() {
         ))}
       </div>
     </div>
+    </>
   );
 }
 

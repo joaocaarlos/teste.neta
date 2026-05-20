@@ -24,6 +24,8 @@ export interface User {
   companyStatus?: CompanyStatus;
   company_status?: CompanyStatus;
   loginAt?: string;
+  onboarding_completed?: boolean;
+  onboarding_completed_at?: string;
 }
 
 export interface Demand {

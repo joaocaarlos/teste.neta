@@ -7,6 +7,7 @@ import { authenticate, authorize } from "../middleware/auth";
 import { validate } from "../lib/validators";
 import { makeUploader, persistUpload } from "../lib/upload";
 import { logger } from "../lib/logger";
+import { sendEmail, emailTemplates } from "../lib/email";
 
 const router = Router();
 
@@ -152,9 +153,65 @@ router.get(
         overall = "incomplete";
       }
 
-      return ok(res, { overall, docs: rows });
+      // Compute enriched fields
+      const missingDocs = REQUIRED_DOC_TYPES.filter((t) => !latestByType[t]);
+      const pendingDocs = REQUIRED_DOC_TYPES.filter((t) => latestByType[t]?.status === "pending");
+      const approvedDocs = REQUIRED_DOC_TYPES.filter((t) => latestByType[t]?.status === "approved");
+
+      // Estimated review time: 2 business days from the oldest pending doc submission
+      const pendingCreatedAts = pendingDocs
+        .map((t) => latestByType[t]?.created_at)
+        .filter((d): d is string => Boolean(d));
+      const oldestPendingAt = pendingCreatedAts.length > 0
+        ? pendingCreatedAts.reduce((a, b) => (a < b ? a : b))
+        : null;
+      const estimatedReviewTime = oldestPendingAt ? "até 2 dias úteis" : null;
+
+      // lastUpdated: most recent doc activity
+      const allDates = rows.map((r) => r.reviewed_at || r.created_at).filter(Boolean);
+      const lastUpdated = allDates.length > 0
+        ? allDates.reduce((a, b) => (a > b ? a : b))
+        : null;
+
+      return ok(res, {
+        overall,
+        docs: rows,
+        missingDocs,
+        pendingDocs,
+        approvedDocs,
+        estimatedReviewTime,
+        lastUpdated,
+      });
     } catch (e) {
       logger.error({ err: e }, "[verification] GET /status error");
+      next(e);
+    }
+  }
+);
+
+// ─── POST /verification/cancel-request — user cancels verification submission ─
+
+router.post(
+  "/cancel-request",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const companyId = req.user!.companyId;
+      if (!companyId) return fail(res, "Usuário sem empresa associada.", "NO_COMPANY", 403);
+
+      // Delete all pending docs for this company (only pending ones — approved/rejected stay)
+      const { rowCount } = await query(
+        `DELETE FROM kyc_documents
+          WHERE company_id = $1
+            AND status = 'pending'`,
+        [companyId]
+      );
+
+      logger.info({ companyId, deleted: rowCount }, "[verification] cancel-request: pending docs removed");
+
+      return ok(res, { deleted: rowCount }, "Pedido de verificação cancelado. Documentos pendentes removidos.");
+    } catch (e) {
+      logger.error({ err: e }, "[verification] POST /cancel-request error");
       next(e);
     }
   }
@@ -279,10 +336,45 @@ router.patch(
 
         const allRequiredApproved = REQUIRED_DOC_TYPES.every((t) => latestByType[t] === "approved");
         if (allRequiredApproved) {
+          // Mark company as verified
           await query(
             `UPDATE companies SET verified = true, kyc_verified_at = NOW() WHERE id = $1`,
             [companyId]
           );
+
+          // Get company owner info for email + notification
+          const { rows: ownerRows } = await query<{ id: string; email: string; name: string; company_name: string }>(
+            `SELECT u.id, u.email, u.name, c.name AS company_name
+               FROM users u
+               JOIN companies c ON c.id = u.company_id
+              WHERE u.company_id = $1
+                AND u.deleted_at IS NULL
+              ORDER BY u.created_at ASC
+              LIMIT 1`,
+            [companyId]
+          );
+
+          const owner = ownerRows[0];
+          if (owner) {
+            // Send approval email
+            try {
+              const tpl = emailTemplates.kycApproved({ companyName: owner.company_name });
+              await sendEmail({ to: owner.email, ...tpl });
+            } catch (emailErr) {
+              logger.warn({ err: emailErr }, "[verification] failed to send KYC approval email");
+            }
+
+            // Create in-app notification
+            try {
+              await query(
+                `INSERT INTO notifications (user_id, type, title, body, data)
+                 VALUES ($1, 'kyc_approved', 'Verificação aprovada', 'Sua empresa foi verificada com sucesso. Você agora tem acesso completo à plataforma.', $2::jsonb)`,
+                [owner.id, JSON.stringify({ companyId })]
+              );
+            } catch (notifErr) {
+              logger.warn({ err: notifErr }, "[verification] failed to create KYC approved notification");
+            }
+          }
         }
       }
 
