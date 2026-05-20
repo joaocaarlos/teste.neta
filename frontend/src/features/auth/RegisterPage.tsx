@@ -3,8 +3,8 @@
  * Inline styles only. TypeScript strict.
  */
 
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../app/AuthContext";
 import { UserRole } from "../../types";
 
@@ -65,6 +65,7 @@ function FormField({
 export function RegisterPage() {
   const { register, loginErr, loginLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [form, setForm] = useState<RegisterForm>({
     name: "",
@@ -76,6 +77,14 @@ export function RegisterPage() {
     city: "",
   });
   const [validErr, setValidErr] = useState("");
+
+  // Pre-select role from ?role= query param
+  useEffect(() => {
+    const roleParam = searchParams.get("role");
+    if (roleParam === "demandante" || roleParam === "fornecedor") {
+      setForm((f) => ({ ...f, role: roleParam as UserRole }));
+    }
+  }, [searchParams]);
 
   const upd = <K extends keyof RegisterForm>(k: K, v: RegisterForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));

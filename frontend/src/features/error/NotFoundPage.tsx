@@ -1,4 +1,5 @@
-import { Home, ArrowLeft } from "lucide-react";
+import { Home, ArrowLeft, LayoutDashboard, ClipboardList, Package, LogIn, UserPlus } from "lucide-react";
+import { useAuth } from "../../app/AuthContext";
 
 interface NotFoundPageProps {
   onHome?: () => void;
@@ -7,8 +8,11 @@ interface NotFoundPageProps {
 
 /**
  * Página 404 customizada com branding CapaCity.
+ * Mostra links contextuais dependendo se o usuário está autenticado ou não.
  */
 export function NotFoundPage({ onHome, onBack }: NotFoundPageProps) {
+  const { user } = useAuth();
+
   return (
     <main
       role="main"
@@ -23,7 +27,7 @@ export function NotFoundPage({ onHome, onBack }: NotFoundPageProps) {
     >
       <div
         style={{
-          maxWidth: 480,
+          maxWidth: 520,
           textAlign: "center",
           display: "flex",
           flexDirection: "column",
@@ -65,76 +69,212 @@ export function NotFoundPage({ onHome, onBack }: NotFoundPageProps) {
               fontSize: 14,
               color: "var(--white2)",
               lineHeight: 1.6,
-              maxWidth: 360,
+              maxWidth: 400,
               margin: "0 auto",
             }}
           >
-            O endereço que você acessou não existe ou foi movido.
-            Verifique a URL ou volte para a página inicial.
+            {user
+              ? "Esta página não existe ou você não tem permissão para acessá-la. Use os atalhos abaixo para continuar navegando."
+              : "O endereço que você acessou não existe ou foi movido. Verifique a URL ou acesse a página inicial."}
           </div>
         </div>
 
+        {/* Contextual quick links */}
         <div
           style={{
             display: "flex",
-            gap: 12,
+            gap: 10,
             flexWrap: "wrap",
             justifyContent: "center",
-            marginTop: 12,
+            marginTop: 8,
           }}
         >
           {onBack && (
             <button
               onClick={onBack}
               style={{
-                padding: "12px 22px",
+                padding: "10px 18px",
                 background: "transparent",
                 color: "var(--white)",
                 border: "1px solid var(--border2)",
                 fontFamily: "var(--cond)",
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: 12,
                 textTransform: "uppercase",
                 letterSpacing: ".08em",
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 6,
                 cursor: "pointer",
               }}
             >
-              <ArrowLeft size={16} aria-hidden="true" />
+              <ArrowLeft size={14} aria-hidden="true" />
               Voltar
             </button>
           )}
 
-          {onHome && (
-            <button
-              onClick={onHome}
-              style={{
-                padding: "12px 22px",
-                background: "var(--amber)",
-                color: "var(--bg)",
-                border: "none",
-                fontFamily: "var(--cond)",
-                fontWeight: 700,
-                fontSize: 13,
-                textTransform: "uppercase",
-                letterSpacing: ".08em",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-              }}
-            >
-              <Home size={16} aria-hidden="true" />
-              Página inicial
-            </button>
+          {user ? (
+            <>
+              <button
+                onClick={() => { window.location.href = "/dashboard"; }}
+                style={{
+                  padding: "10px 18px",
+                  background: "var(--amber)",
+                  color: "var(--bg)",
+                  border: "none",
+                  fontFamily: "var(--cond)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <LayoutDashboard size={14} aria-hidden="true" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => { window.location.href = "/demandas"; }}
+                style={{
+                  padding: "10px 18px",
+                  background: "transparent",
+                  color: "var(--white2)",
+                  border: "1px solid var(--border2)",
+                  fontFamily: "var(--cond)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <ClipboardList size={14} aria-hidden="true" />
+                Demandas
+              </button>
+              <button
+                onClick={() => { window.location.href = "/pedidos"; }}
+                style={{
+                  padding: "10px 18px",
+                  background: "transparent",
+                  color: "var(--white2)",
+                  border: "1px solid var(--border2)",
+                  fontFamily: "var(--cond)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <Package size={14} aria-hidden="true" />
+                Pedidos
+              </button>
+            </>
+          ) : (
+            <>
+              {onHome ? (
+                <button
+                  onClick={onHome}
+                  style={{
+                    padding: "10px 18px",
+                    background: "var(--amber)",
+                    color: "var(--bg)",
+                    border: "none",
+                    fontFamily: "var(--cond)",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: ".08em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Home size={14} aria-hidden="true" />
+                  Página inicial
+                </button>
+              ) : (
+                <button
+                  onClick={() => { window.location.href = "/"; }}
+                  style={{
+                    padding: "10px 18px",
+                    background: "var(--amber)",
+                    color: "var(--bg)",
+                    border: "none",
+                    fontFamily: "var(--cond)",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    textTransform: "uppercase",
+                    letterSpacing: ".08em",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Home size={14} aria-hidden="true" />
+                  Página inicial
+                </button>
+              )}
+              <button
+                onClick={() => { window.location.href = "/login"; }}
+                style={{
+                  padding: "10px 18px",
+                  background: "transparent",
+                  color: "var(--white2)",
+                  border: "1px solid var(--border2)",
+                  fontFamily: "var(--cond)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <LogIn size={14} aria-hidden="true" />
+                Entrar
+              </button>
+              <button
+                onClick={() => { window.location.href = "/cadastro"; }}
+                style={{
+                  padding: "10px 18px",
+                  background: "transparent",
+                  color: "var(--white2)",
+                  border: "1px solid var(--border2)",
+                  fontFamily: "var(--cond)",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <UserPlus size={14} aria-hidden="true" />
+                Cadastrar
+              </button>
+            </>
           )}
         </div>
 
         <div
           style={{
-            marginTop: 32,
+            marginTop: 24,
             paddingTop: 24,
             borderTop: "1px solid var(--border)",
             fontFamily: "var(--mono)",

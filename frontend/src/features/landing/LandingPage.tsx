@@ -32,6 +32,21 @@ interface StatItem {
   label: string;
 }
 
+interface TestimonialItem {
+  company: string;
+  segment: string;
+  result: string;
+  quote: string;
+  initials: string;
+}
+
+interface ProcessStep {
+  n: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STEPS: StepItem[] = [
@@ -121,6 +136,47 @@ const STATS: StatItem[] = [
   { value: "R$780M", label: "Capacidade negociada" },
   { value: "98%", label: "Entregas no prazo" },
   { value: "34h", label: "Tempo p/ proposta" },
+];
+
+const TESTIMONIALS: TestimonialItem[] = [
+  {
+    company: "Metalúrgica Pinheiro",
+    segment: "Usinagem CNC · São Paulo",
+    result: "+R$280k em pedidos no 1º semestre",
+    quote:
+      "Em 3 meses preenchemos 80% da nossa capacidade ociosa. O matching é preciso e o escrow dá segurança para aceitar clientes novos.",
+    initials: "MP",
+  },
+  {
+    company: "Grupo Têxtil Nordeste",
+    segment: "Confecção · Fortaleza",
+    result: "Tempo de cotação de 7 dias para 34h",
+    quote:
+      "Antes levávamos uma semana para fechar orçamento. Agora recebemos propostas comparáveis em menos de dois dias com score automático.",
+    initials: "GT",
+  },
+  {
+    company: "Injetec Plásticos",
+    segment: "Injeção Plástica · Joinville",
+    result: "98% de entregas no prazo após 60 pedidos",
+    quote:
+      "O acompanhamento em tempo real e o contrato digital nos deram credibilidade com clientes novos sem nenhuma ligação extra.",
+    initials: "IP",
+  },
+];
+
+const PROCESS_STEPS_DEMANDANTE: ProcessStep[] = [
+  { n: "01", icon: "📋", title: "Publique a demanda", description: "Descreva o processo, material, quantidade e prazo. Menos de 2 minutos." },
+  { n: "02", icon: "⚡", title: "Receba propostas", description: "Fábricas compatíveis respondem em até 34h com score 0–100 automático." },
+  { n: "03", icon: "📊", title: "Compare e escolha", description: "Compare preço, prazo e histórico. Aceite com um clique." },
+  { n: "04", icon: "🔒", title: "Produza com segurança", description: "Contrato digital, NDA e pagamento em escrow. Acompanhe em tempo real." },
+];
+
+const PROCESS_STEPS_FORNECEDOR: ProcessStep[] = [
+  { n: "01", icon: "🏭", title: "Cadastre sua fábrica", description: "Informe processos, capacidade e certificações. Verificação em 48h." },
+  { n: "02", icon: "🎯", title: "Receba demandas matching", description: "Notificações de demandas compatíveis com sua capacidade e processo." },
+  { n: "03", icon: "📝", title: "Envie sua proposta", description: "Preencha preço, prazo e condições. Proposta chega comparada às demais." },
+  { n: "04", icon: "💰", title: "Produza e receba", description: "Produza, entregue e receba o pagamento liberado automaticamente do escrow." },
 ];
 
 const FAQ_ITEMS: FaqItem[] = [
@@ -374,7 +430,7 @@ export function LandingPage() {
           }}
         >
           <a
-            href="/login"
+            href="/cadastro?role=demandante"
             style={{
               fontFamily: "var(--mono)",
               fontSize: 12,
@@ -389,10 +445,10 @@ export function LandingPage() {
               textDecoration: "none",
             }}
           >
-            Tenho demanda produtiva →
+            Sou Demandante →
           </a>
           <a
-            href="/como-funciona"
+            href="/cadastro?role=fornecedor"
             style={{
               fontFamily: "var(--mono)",
               fontSize: 12,
@@ -407,7 +463,7 @@ export function LandingPage() {
               textDecoration: "none",
             }}
           >
-            Como Funciona
+            Sou Fornecedor →
           </a>
         </div>
 
@@ -721,6 +777,128 @@ export function LandingPage() {
         >
           Ver todos os planos →
         </a>
+      </section>
+
+      {/* ─── Como funciona por perfil ─────────────────────────────────── */}
+      <section
+        id="perfis"
+        style={{
+          padding: "80px 5%",
+          position: "relative",
+          zIndex: 1,
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ marginBottom: 48 }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--amber)", marginBottom: 8 }}>
+            Dois perfis
+          </div>
+          <h2 style={{ fontFamily: "var(--cond)", fontSize: "clamp(32px,5vw,56px)", fontWeight: 900, textTransform: "uppercase", letterSpacing: ".04em", margin: 0 }}>
+            COMO FUNCIONA <span style={{ color: "var(--amber)" }}>PARA MIM</span>
+          </h2>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 1100 }}>
+          {/* Demandante */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ fontFamily: "var(--cond)", fontSize: 16, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--amber)", border: "1px solid var(--amber)44", padding: "4px 12px" }}>
+                Demandante
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--white3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Quero contratar
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border)" }}>
+              {PROCESS_STEPS_DEMANDANTE.map((step, i) => (
+                <div key={step.n} style={{ padding: "20px 22px", borderBottom: i < PROCESS_STEPS_DEMANDANTE.length - 1 ? "1px solid var(--border)" : "none", background: "var(--bg2)", display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  <div style={{ fontFamily: "var(--cond)", fontSize: 28, fontWeight: 900, color: "var(--amber)", lineHeight: 1, width: 36, flexShrink: 0 }}>{step.n}</div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 18 }}>{step.icon}</span>
+                      <span style={{ fontFamily: "var(--cond)", fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em" }}>{step.title}</span>
+                    </div>
+                    <div style={{ fontFamily: "var(--body)", fontSize: 12, fontWeight: 300, color: "var(--white2)", lineHeight: 1.6 }}>{step.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <a href="/cadastro?role=demandante" style={{ display: "inline-block", marginTop: 16, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", background: "var(--amber)", color: "var(--bg)", textDecoration: "none", padding: "12px 24px" }}>
+              Cadastrar como Demandante →
+            </a>
+          </div>
+
+          {/* Fornecedor */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ fontFamily: "var(--cond)", fontSize: 16, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--white)", border: "1px solid var(--border2)", padding: "4px 12px" }}>
+                Fornecedor
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--white3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
+                Tenho capacidade
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, border: "1px solid var(--border)" }}>
+              {PROCESS_STEPS_FORNECEDOR.map((step, i) => (
+                <div key={step.n} style={{ padding: "20px 22px", borderBottom: i < PROCESS_STEPS_FORNECEDOR.length - 1 ? "1px solid var(--border)" : "none", background: "var(--bg2)", display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  <div style={{ fontFamily: "var(--cond)", fontSize: 28, fontWeight: 900, color: "var(--white3)", lineHeight: 1, width: 36, flexShrink: 0 }}>{step.n}</div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 18 }}>{step.icon}</span>
+                      <span style={{ fontFamily: "var(--cond)", fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em" }}>{step.title}</span>
+                    </div>
+                    <div style={{ fontFamily: "var(--body)", fontSize: 12, fontWeight: 300, color: "var(--white2)", lineHeight: 1.6 }}>{step.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <a href="/cadastro?role=fornecedor" style={{ display: "inline-block", marginTop: 16, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", background: "transparent", color: "var(--white2)", border: "1px solid var(--border2)", textDecoration: "none", padding: "12px 24px" }}>
+              Cadastrar como Fornecedor →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Depoimentos ──────────────────────────────────────────────────── */}
+      <section
+        id="depoimentos"
+        style={{
+          padding: "80px 5%",
+          position: "relative",
+          zIndex: 1,
+          borderTop: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ marginBottom: 36 }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: ".18em", textTransform: "uppercase", color: "var(--amber)", marginBottom: 8 }}>
+            Resultados
+          </div>
+          <h2 style={{ fontFamily: "var(--cond)", fontSize: "clamp(32px,5vw,56px)", fontWeight: 900, textTransform: "uppercase", letterSpacing: ".04em", margin: 0 }}>
+            QUEM JÁ <span style={{ color: "var(--amber)" }}>USA</span>
+          </h2>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, maxWidth: 1100 }}>
+          {TESTIMONIALS.map((t) => (
+            <div key={t.company} style={{ background: "var(--bg2)", border: "1px solid var(--border)", padding: "28px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--amber)22", border: "1px solid var(--amber)44", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--cond)", fontSize: 14, fontWeight: 800, color: "var(--amber)", flexShrink: 0 }}>
+                  {t.initials}
+                </div>
+                <div>
+                  <div style={{ fontFamily: "var(--cond)", fontSize: 14, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em" }}>{t.company}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--white3)", textTransform: "uppercase", letterSpacing: ".06em", marginTop: 2 }}>{t.segment}</div>
+                </div>
+              </div>
+              <div style={{ fontFamily: "var(--body)", fontSize: 13, color: "var(--white2)", lineHeight: 1.65, fontStyle: "italic" }}>
+                "{t.quote}"
+              </div>
+              <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: 10, color: "var(--amber)", letterSpacing: ".04em" }}>
+                {t.result}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ─── FAQ ──────────────────────────────────────────────────────────── */}

@@ -711,13 +711,23 @@ export function OrdersPage() {
           icon={<Package size={48} />}
           title={
             statusFilter === "all"
-              ? "Nenhum pedido encontrado"
+              ? "Você não tem pedidos"
               : "Nenhum pedido nesta categoria"
           }
           message={
             statusFilter === "all"
-              ? "Quando uma proposta for aceita, o pedido aparece aqui."
+              ? "Quando uma proposta for aceita, o pedido aparece aqui. Explore as demandas disponíveis."
               : "Tente selecionar outro filtro."
+          }
+          action={
+            statusFilter === "all"
+              ? {
+                  label: "Ver Demandas",
+                  onClick: () => {
+                    window.location.href = "/demandas";
+                  },
+                }
+              : undefined
           }
         />
       )}
