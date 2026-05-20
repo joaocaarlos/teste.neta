@@ -29,7 +29,11 @@ CREATE TABLE IF NOT EXISTS calendar_slots (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (company_id, machine_id, year, month, day, turn)
 );
-CREATE INDEX IF NOT EXISTS idx_calslots_company ON calendar_slots(company_id, year, month);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='calendar_slots' AND column_name='company_id') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_calslots_company ON calendar_slots(company_id, year, month)';
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_calslots_start_at ON calendar_slots(machine_id, start_at);
 
 -- Task 4: recurring_orders

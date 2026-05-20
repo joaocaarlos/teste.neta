@@ -21,9 +21,9 @@ ALTER TABLE demands
 -- backfill: aplica sla_hours baseado em urgency para registros antigos
 UPDATE demands SET sla_hours = CASE
   WHEN urgency = 'Baixa'    THEN 72
-  WHEN urgency = 'Média'    THEN 48
+  WHEN urgency = 'Media'    THEN 48
   WHEN urgency = 'Alta'     THEN 24
-  WHEN urgency = 'Crítica'  THEN 8
+  WHEN urgency = 'Critica'  THEN 8
   ELSE 48
 END
 WHERE sla_hours IS NULL;

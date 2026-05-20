@@ -54,7 +54,11 @@ ALTER TABLE demands
 CREATE INDEX IF NOT EXISTS idx_companies_processes ON companies USING GIN(processes);
 CREATE INDEX IF NOT EXISTS idx_companies_materials ON companies USING GIN(materials);
 CREATE INDEX IF NOT EXISTS idx_companies_trust_score ON companies(trust_score DESC);
-CREATE INDEX IF NOT EXISTS idx_companies_state ON companies(state);
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='state') THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_companies_state ON companies(state)';
+  END IF;
+END $$;
 
 -- #20 Machines available_capacity column
 ALTER TABLE machines
