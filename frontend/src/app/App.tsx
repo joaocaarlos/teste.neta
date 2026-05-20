@@ -31,6 +31,11 @@ const StatusPage      = lazy(() => import("../features/status/StatusPage").then(
 // Legacy app — todo o resto. Lazy para code-splitting.
 const LegacyApp = lazy(() => import("../legacy/LegacyApp"));
 
+// Extracted landing / reviews / order-tracking pages
+const LandingPage         = lazy(() => import("../features/landing/LandingPage").then(m => ({ default: m.LandingPage })));
+const ReviewsPage         = lazy(() => import("../features/reviews/ReviewsPage").then(m => ({ default: m.ReviewsPage })));
+const OrderTrackingPage   = lazy(() => import("../features/tracking/OrderTrackingPage").then(m => ({ default: m.OrderTrackingPage })));
+
 // New modular feature pages
 const MessagesPage        = lazy(() => import("../features/messages/MessagesPage").then(m => ({ default: m.MessagesPage })));
 const MachinesPage        = lazy(() => import("../features/machines/MachinesPage").then(m => ({ default: m.MachinesPage })));
@@ -108,8 +113,8 @@ const router = createBrowserRouter([
   { path: "/terms",         element: <RouteWrapper><TermsPage /></RouteWrapper> },
   { path: "/status",        element: <RouteWrapper><StatusPage /></RouteWrapper> },
 
-  // Legacy app handles all authenticated + auth routes
-  { path: "/",                      element: <LegacyApp /> },
+  // Landing + extracted feature routes
+  { path: "/",                      element: <RouteWrapper><LandingPage /></RouteWrapper> },
   { path: "/login",                 element: <RouteWrapper><LoginPage /></RouteWrapper> },
   { path: "/cadastro",              element: <RouteWrapper><RegisterPage /></RouteWrapper> },
   { path: "/register",              element: <RouteWrapper><RegisterPage /></RouteWrapper> },
@@ -130,7 +135,7 @@ const router = createBrowserRouter([
   { path: "/chat/*",                element: <RouteWrapper><MessagesPage /></RouteWrapper> },
   { path: "/financeiro/*",          element: <RouteWrapper><FinancialPage /></RouteWrapper> },
   { path: "/disputas/*",            element: <RouteWrapper><DisputeList /></RouteWrapper> },
-  { path: "/avaliacoes/*",          element: <LegacyApp /> },
+  { path: "/avaliacoes/*",          element: <RouteWrapper><ReviewsPage /></RouteWrapper> },
   { path: "/qualidade/*",           element: <RouteWrapper><QualityPage /></RouteWrapper> },
   { path: "/verificacao/*",         element: <RouteWrapper><VerificationPage /></RouteWrapper> },
   { path: "/verificacao-admin/*",   element: <RouteWrapper><AdminVerificationPage /></RouteWrapper> },
@@ -144,7 +149,7 @@ const router = createBrowserRouter([
   { path: "/comparar/*",            element: <RouteWrapper><ProposalComparePage /></RouteWrapper> },
   { path: "/fornecedores/*",        element: <RouteWrapper><SuppliersPage /></RouteWrapper> },
   { path: "/nova-demanda/*",        element: <RouteWrapper><DemandWizard onPublish={async () => { window.location.href = "/demandas"; }} onCancel={() => window.history.back()} /></RouteWrapper> },
-  { path: "/acompanhamento/*",      element: <LegacyApp /> },
+  { path: "/acompanhamento/*",      element: <RouteWrapper><OrderTrackingPage /></RouteWrapper> },
 
   // 404 fallback
   { path: "*", element: <NotFoundRoute /> },
