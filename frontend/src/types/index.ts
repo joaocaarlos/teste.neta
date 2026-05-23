@@ -350,9 +350,12 @@ export interface AuthContextType {
   loginErr: string;
   loginLoading: boolean;
   login: (email: string, password: string, role: UserRole, totp?: string) => Promise<boolean | string>;
+  loginGoogle: (idToken: string) => Promise<boolean | string>;
   register: (form: any) => Promise<boolean>;
   logout: () => Promise<void>;
   updateUser: (patch: Partial<User>) => void;
+  verify3fa: (userId: string, code: string) => Promise<boolean | string>;
+  resend3fa: (userId: string) => Promise<void>;
 }
 
 export interface AppContextType {

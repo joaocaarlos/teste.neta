@@ -1,313 +1,369 @@
 /**
- * LoginPage — standalone login page for /login route.
- * Inline styles only. TypeScript strict.
+ * LoginPage — fluxo completo: email/senha, Google OAuth, TOTP (2FA) e 3FA email OTP.
  */
-
 import React, { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
+import { Eye, EyeOff, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "../../app/AuthContext";
 import { Input } from "../../components/ui/Input";
 import { UserRole } from "../../types";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type Step = "credentials" | "totp" | "3fa";
 
-type RoleOption = { role: UserRole; label: string };
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const ROLE_OPTIONS: RoleOption[] = [
-  { role: "demandante", label: "Sou demandante" },
-  { role: "fornecedor", label: "Sou fornecedor" },
+const ROLE_OPTIONS = [
+  { role: "demandante" as UserRole, label: "Sou demandante" },
+  { role: "fornecedor" as UserRole, label: "Sou fornecedor" },
 ];
 
-// ─── LoginPage ────────────────────────────────────────────────────────────────
-
 export function LoginPage() {
-  const { login, loginErr, loginLoading } = useAuth();
+  const navigate = useNavigate();
+  const { login, loginGoogle, verify3fa, resend3fa, loginErr, loginLoading } = useAuth();
 
+  const [step, setStep] = useState<Step>("credentials");
   const [role, setRole] = useState<UserRole>("demandante");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [threeFaCode, setThreeFaCode] = useState("");
+  const [pendingUserId, setPendingUserId] = useState("");
   const [localError, setLocalError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError("");
-
-    if (!email.trim()) {
-      setLocalError("Informe o e-mail.");
-      return;
-    }
-    if (!password) {
-      setLocalError("Informe a senha.");
-      return;
-    }
-
-    const result = await login(email.trim(), password, role);
-    if (result === true) {
-      window.location.href = "/dashboard";
-    }
-  };
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const displayError = localError || loginErr;
 
+  // Step 1: login normal
+  const handleCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError("");
+    if (!email.trim()) { setLocalError("Informe o e-mail."); return; }
+    if (!password) { setLocalError("Informe a senha."); return; }
+
+    const result = await login(email.trim(), password, role);
+    if (result === true) {
+      navigate("/dashboard");
+    } else if (typeof result === "string" && result === "totp_required") {
+      setStep("totp");
+    } else if (typeof result === "string" && result.startsWith("3fa_required|")) {
+      const uid = result.split("|")[1];
+      setPendingUserId(uid);
+      setStep("3fa");
+    }
+  };
+
+  // Step 2: TOTP
+  const handleTotp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError("");
+    if (totpCode.length < 6) { setLocalError("Código deve ter 6 dígitos."); return; }
+    const result = await login(email.trim(), password, role, totpCode);
+    if (result === true) {
+      navigate("/dashboard");
+    } else if (typeof result === "string" && result.startsWith("3fa_required|")) {
+      const uid = result.split("|")[1];
+      setPendingUserId(uid);
+      setStep("3fa");
+    }
+  };
+
+  // Step 3: 3FA e-mail OTP
+  const handleThreeFa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError("");
+    if (threeFaCode.length < 6) { setLocalError("Código deve ter 6 dígitos."); return; }
+    const result = await verify3fa(pendingUserId, threeFaCode);
+    if (result === true) navigate("/dashboard");
+  };
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    await resend3fa(pendingUserId);
+    setResendCooldown(60);
+    const interval = setInterval(() => {
+      setResendCooldown(prev => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; });
+    }, 1000);
+  };
+
+  // Google OAuth
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) return;
+    const result = await loginGoogle(credentialResponse.credential);
+    if (result === true) {
+      navigate("/dashboard");
+    } else if (typeof result === "string" && result.startsWith("3fa_required|")) {
+      const uid = result.split("|")[1];
+      setPendingUserId(uid);
+      setStep("3fa");
+    }
+  };
+
+  // ─── Estilos base ─────────────────────────────────────────────────────────
+
+  const containerStyle: React.CSSProperties = {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--bg)",
+    padding: "24px 16px",
+    fontFamily: "var(--body)",
+  };
+
+  const cardStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 420,
+    background: "var(--bg2)",
+    border: "1px solid var(--border)",
+    padding: "40px 36px",
+  };
+
+  const titleStyle: React.CSSProperties = {
+    fontFamily: "var(--cond)",
+    fontSize: 28,
+    fontWeight: 700,
+    color: "var(--white)",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  };
+
+  const subtitleStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: "var(--white3)",
+    marginBottom: 28,
+  };
+
+  const btnPrimary: React.CSSProperties = {
+    width: "100%",
+    background: "var(--amber)",
+    color: "#000",
+    fontFamily: "var(--cond)",
+    fontSize: 15,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    border: "none",
+    padding: "12px",
+    cursor: "pointer",
+    marginTop: 8,
+  };
+
+  const btnSecondary: React.CSSProperties = {
+    background: "transparent",
+    border: "none",
+    color: "var(--amber)",
+    fontSize: 13,
+    cursor: "pointer",
+    padding: "4px 0",
+    fontFamily: "var(--body)",
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    margin: "20px 0",
+    color: "var(--white3)",
+    fontSize: 12,
+  };
+
+  const dividerLine: React.CSSProperties = { flex: 1, height: 1, background: "var(--border)" };
+
+  // ─── Renderizar step ───────────────────────────────────────────────────────
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--bg)",
-        padding: "24px 16px",
-        fontFamily: "var(--body)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "var(--bg2)",
-          border: "1px solid var(--border)",
-          padding: "40px 36px",
-        }}
-      >
-        {/* ─── Logo / Title ───────────────────────────────────────────────── */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div
-            style={{
-              fontFamily: "var(--cond)",
-              fontSize: 32,
-              fontWeight: 800,
-              textTransform: "uppercase",
-              letterSpacing: ".08em",
-              color: "var(--amber)",
-              marginBottom: 4,
-            }}
-          >
-            CapaCity
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              color: "var(--white3)",
-              textTransform: "uppercase",
-              letterSpacing: ".12em",
-            }}
-          >
-            Plataforma industrial
-          </div>
-        </div>
+    <div style={containerStyle}>
+      <div style={cardStyle}>
 
-        {/* ─── Role selector ──────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 9,
-              color: "var(--white3)",
-              textTransform: "uppercase",
-              letterSpacing: ".12em",
-              marginBottom: 8,
-            }}
-          >
-            Tipo de conta
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: 0,
-              border: "1px solid var(--border)",
-            }}
-          >
-            {ROLE_OPTIONS.map(({ role: r, label }) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                style={{
-                  flex: 1,
-                  padding: "10px 12px",
-                  background: role === r ? "var(--amber)" : "transparent",
-                  border: "none",
-                  borderRight: r === "demandante" ? "1px solid var(--border)" : "none",
-                  color: role === r ? "var(--bg)" : "var(--white2)",
-                  fontFamily: "var(--cond)",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  textTransform: "uppercase",
-                  letterSpacing: ".06em",
-                  cursor: "pointer",
-                  transition: "background .15s, color .15s",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ─── Form ───────────────────────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} noValidate>
-          <Input
-            label="E-mail"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            autoComplete="email"
-            disabled={loginLoading}
-          />
-
-          {/* Password with show/hide toggle */}
-          <div style={{ marginBottom: 16 }}>
-            <label
-              style={{
-                display: "block",
-                fontFamily: "var(--mono)",
-                fontSize: "10px",
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--white2)",
-                marginBottom: 6,
-              }}
-            >
-              Senha
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                disabled={loginLoading}
-                style={{
-                  background: "var(--bg3)",
-                  border: "1px solid var(--border)",
-                  color: "var(--white)",
-                  fontFamily: "var(--body)",
-                  fontSize: "16px",
-                  padding: "10px 42px 10px 14px",
-                  outline: "none",
-                  width: "100%",
-                  boxSizing: "border-box",
-                  borderRadius: 0,
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--white3)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 0,
-                }}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {/* ─── Error ──────────────────────────────────────────────────── */}
-          {displayError && (
-            <div
-              style={{
-                padding: "10px 14px",
-                background: "var(--red)22",
-                border: "1px solid var(--red)44",
-                color: "var(--red)",
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                marginBottom: 16,
-              }}
-            >
-              {displayError}
-            </div>
+        {/* Header */}
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={titleStyle}>CAPA<span style={{ color: "var(--amber)" }}>CITY</span></div>
+          {step === "credentials" && <p style={subtitleStyle}>Entre na sua conta</p>}
+          {step === "totp" && (
+            <p style={subtitleStyle}>
+              <ShieldCheck size={14} style={{ display: "inline", marginRight: 4 }} />
+              Verificação em 2 fatores
+            </p>
           )}
-
-          {/* ─── Submit ─────────────────────────────────────────────────── */}
-          <button
-            type="submit"
-            disabled={loginLoading}
-            style={{
-              width: "100%",
-              padding: "12px 0",
-              background: loginLoading ? "var(--border2)" : "var(--amber)",
-              border: "none",
-              color: loginLoading ? "var(--white3)" : "var(--bg)",
-              fontFamily: "var(--cond)",
-              fontWeight: 700,
-              fontSize: 14,
-              textTransform: "uppercase",
-              letterSpacing: ".08em",
-              cursor: loginLoading ? "not-allowed" : "pointer",
-              transition: "background .15s",
-            }}
-          >
-            {loginLoading ? "Entrando…" : "Entrar"}
-          </button>
-        </form>
-
-        {/* ─── Links ──────────────────────────────────────────────────────── */}
-        <div
-          style={{
-            marginTop: 20,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <a
-            href="/forgot-password"
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              color: "var(--white3)",
-              textDecoration: "none",
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = "var(--amber)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = "var(--white3)";
-            }}
-          >
-            Esqueceu a senha?
-          </a>
-          <a
-            href="/cadastro"
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              color: "var(--white3)",
-              textDecoration: "none",
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = "var(--amber)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.color = "var(--white3)";
-            }}
-          >
-            Criar conta
-          </a>
+          {step === "3fa" && (
+            <p style={subtitleStyle}>
+              <Mail size={14} style={{ display: "inline", marginRight: 4 }} />
+              Verificação em 3 fatores
+            </p>
+          )}
         </div>
+
+        {/* Erro */}
+        {displayError && (
+          <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", padding: "10px 14px", fontSize: 13, marginBottom: 16 }}>
+            {displayError}
+          </div>
+        )}
+
+        {/* ─── Step 1: Credenciais ──────────────────────────────────────── */}
+        {step === "credentials" && (
+          <>
+            {/* Seletor de role */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {ROLE_OPTIONS.map(opt => (
+                <button
+                  key={opt.role}
+                  type="button"
+                  onClick={() => setRole(opt.role)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 4px",
+                    border: `1px solid ${role === opt.role ? "var(--amber)" : "var(--border)"}`,
+                    background: role === opt.role ? "rgba(217,119,6,0.1)" : "transparent",
+                    color: role === opt.role ? "var(--amber)" : "var(--white3)",
+                    fontFamily: "var(--mono)",
+                    fontSize: 11,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    cursor: "pointer",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Formulário */}
+            <form onSubmit={handleCredentials}>
+              <div style={{ marginBottom: 16 }}>
+                <Input
+                  label="E-mail"
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  autoComplete="email"
+                />
+              </div>
+              <div style={{ marginBottom: 20, position: "relative" }}>
+                <Input
+                  label="Senha"
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Sua senha"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(p => !p)}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  style={{ position: "absolute", right: 12, top: 30, background: "none", border: "none", color: "var(--white3)", cursor: "pointer" }}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              <button type="submit" disabled={loginLoading} style={btnPrimary}>
+                {loginLoading ? "Entrando..." : "Entrar"}
+              </button>
+            </form>
+
+            {/* Divisor */}
+            <div style={dividerStyle}>
+              <span style={dividerLine} /><span>ou</span><span style={dividerLine} />
+            </div>
+
+            {/* Google OAuth */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setLocalError("Falha ao autenticar com Google.")}
+                text="signin_with"
+                shape="rectangular"
+                theme="filled_black"
+                width="348"
+              />
+            </div>
+
+            {/* Links */}
+            <div style={{ marginTop: 20, textAlign: "center", display: "flex", flexDirection: "column", gap: 8 }}>
+              <button type="button" style={btnSecondary} onClick={() => (window.location.href = "/forgot-password")}>
+                Esqueci minha senha
+              </button>
+              <span style={{ fontSize: 13, color: "var(--white3)" }}>
+                Não tem conta?{" "}
+                <button type="button" style={{ ...btnSecondary, display: "inline" }} onClick={() => (window.location.href = "/cadastro")}>
+                  Cadastre-se
+                </button>
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* ─── Step 2: TOTP ─────────────────────────────────────────────── */}
+        {step === "totp" && (
+          <form onSubmit={handleTotp}>
+            <p style={{ fontSize: 14, color: "var(--white2)", marginBottom: 20 }}>
+              Abra seu aplicativo autenticador (Google Authenticator, Authy) e insira o código de 6 dígitos.
+            </p>
+            <div style={{ marginBottom: 20 }}>
+              <Input
+                label="Código do autenticador"
+                id="totp-code"
+                type="text"
+                value={totpCode}
+                onChange={e => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                autoComplete="one-time-code"
+                autoFocus
+              />
+            </div>
+            <button type="submit" disabled={loginLoading || totpCode.length < 6} style={btnPrimary}>
+              {loginLoading ? "Verificando..." : "Verificar código"}
+            </button>
+            <div style={{ textAlign: "center", marginTop: 12 }}>
+              <button type="button" style={btnSecondary} onClick={() => { setStep("credentials"); setTotpCode(""); }}>
+                ← Voltar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ─── Step 3: 3FA e-mail OTP ───────────────────────────────────── */}
+        {step === "3fa" && (
+          <form onSubmit={handleThreeFa}>
+            <p style={{ fontSize: 14, color: "var(--white2)", marginBottom: 20 }}>
+              Um código de 6 dígitos foi enviado para o seu e-mail. Insira abaixo para concluir o acesso.
+            </p>
+            <div style={{ marginBottom: 20 }}>
+              <Input
+                label="Código de verificação (e-mail)"
+                id="3fa-code"
+                type="text"
+                value={threeFaCode}
+                onChange={e => setThreeFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                autoComplete="one-time-code"
+                autoFocus
+              />
+            </div>
+            <button type="submit" disabled={loginLoading || threeFaCode.length < 6} style={btnPrimary}>
+              {loginLoading ? "Verificando..." : "Confirmar acesso"}
+            </button>
+            <div style={{ textAlign: "center", marginTop: 12, display: "flex", justifyContent: "center", gap: 16 }}>
+              <button
+                type="button"
+                style={{ ...btnSecondary, opacity: resendCooldown > 0 ? 0.5 : 1 }}
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+              >
+                {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : "Reenviar código"}
+              </button>
+              <button type="button" style={btnSecondary} onClick={() => { setStep("credentials"); setThreeFaCode(""); }}>
+                ← Voltar
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
