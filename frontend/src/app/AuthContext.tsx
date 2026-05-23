@@ -147,15 +147,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const loginGoogle = useCallback(async (idToken: string): Promise<boolean | string> => {
+    setLoginLoading(true);
+    setLoginErr("");
+    try {
+      const res = await fetch("/api/v1/auth/google", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginErr(data.error || "Erro ao autenticar com Google.");
+        return data.code || false;
+      }
+      if (data.code === "3fa_required") return data.code + "|" + data.userId;
+      clearLegacySession();
+      setUser(toUser(data.user));
+      toast.success("Login com Google realizado!");
+      return true;
+    } catch {
+      setLoginErr("Erro de conexão.");
+      return false;
+    } finally {
+      setLoginLoading(false);
+    }
+  }, []);
+
+  const verify3fa = useCallback(async (userId: string, code: string): Promise<boolean | string> => {
+    setLoginLoading(true);
+    setLoginErr("");
+    try {
+      const res = await fetch("/api/v1/auth/3fa/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLoginErr(data.error || "Código inválido.");
+        return false;
+      }
+      clearLegacySession();
+      setUser(toUser(data.user));
+      toast.success("Verificação concluída!");
+      return true;
+    } catch {
+      setLoginErr("Erro de conexão.");
+      return false;
+    } finally {
+      setLoginLoading(false);
+    }
+  }, []);
+
+  const resend3fa = useCallback(async (userId: string): Promise<void> => {
+    await fetch("/api/v1/auth/3fa/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    toast.info("Novo código enviado por e-mail.");
+  }, []);
+
   const value: AuthContextType = {
     user,
     authLoading,
     login,
+    loginGoogle,
     register,
     logout,
     updateUser,
     loginErr,
     loginLoading,
+    verify3fa,
+    resend3fa,
   };
 
   return (

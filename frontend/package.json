@@ -16,6 +16,7 @@
     "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "@sentry/react": "^8.55.0",
     "lucide-react": "^0.441.0",
     "react": "^18.3.1",

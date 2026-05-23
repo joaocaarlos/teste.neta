@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import speakeasy from "speakeasy";
 import { body } from "express-validator";
 import { z } from "zod";
+import { OAuth2Client } from "google-auth-library";
 import { query } from "../db";
 import { authenticate, revokeAccessToken } from "../middleware/auth";
 import { audit } from "../lib/audit";
@@ -66,6 +67,9 @@ interface UserRow {
   email_verified_at?: Date | null;
   totp_secret?: string | null;
   totp_enabled?: boolean;
+  three_fa_enabled?: boolean;
+  google_id?: string | null;
+  auth_provider?: string;
 }
 
 const loginLimiter = rateLimit({
@@ -89,6 +93,8 @@ const forgotPasswordLimit = rateLimit({
   max: 5,
   message: { error: "Limite de tentativas atingido. Tente em 1 hora." },
 });
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function createCsrfToken(): string {
   return crypto.randomBytes(24).toString("base64url");
@@ -226,7 +232,7 @@ router.post(
 
       const { rows } = await query<UserRow>(
         `SELECT id, email, password_hash, role, name, company_id, cnpj, avatar, avatar_url,
-                email_verified_at, totp_secret, totp_enabled
+                email_verified_at, totp_secret, totp_enabled, three_fa_enabled
          FROM users
          WHERE email = $1 AND deleted_at IS NULL`,
         [normalizedEmail]
@@ -261,6 +267,12 @@ router.post(
           await recordFailedLogin(normalizedEmail);
           return res.status(401).json({ error: "Codigo 2FA invalido.", code: "totp_invalid" });
         }
+      }
+
+      // Após verificação de TOTP bem-sucedida, verificar 3FA
+      if (user.three_fa_enabled) {
+        await send3faCode(user.id, user.email, req);
+        return res.status(200).json({ code: "3fa_required", userId: user.id });
       }
 
       if (
@@ -565,6 +577,185 @@ router.post("/logout", authenticate, async (req: Request, res: Response, next: N
     await audit(req, "Logout", "auth");
     res.json({ message: "Logout registrado." });
   } catch (err) { next(err); }
+});
+
+// ─── Helpers 3FA ────────────────────────────────────────────────────────────
+
+async function send3faCode(userId: string, email: string, req: Request): Promise<void> {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+  await query(
+    `INSERT INTO three_fa_codes (user_id, code, expires_at, ip) VALUES ($1, $2, $3, $4)`,
+    [userId, code, expiresAt, req.ip]
+  );
+
+  await sendEmail({
+    to: email,
+    subject: "Seu código de verificação — CapaCity",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#D97706">🔐 Verificação em 3 fatores</h2>
+        <p>Seu código de acesso é:</p>
+        <div style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#111;background:#f5f5f5;padding:16px;text-align:center;border-radius:4px">
+          ${code}
+        </div>
+        <p style="color:#666;font-size:12px">Expira em 10 minutos. Não compartilhe este código.</p>
+      </div>
+    `,
+  });
+}
+
+// ─── Google OAuth ────────────────────────────────────────────────────────────
+
+router.post("/google", authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken) return res.status(400).json({ error: "idToken obrigatório." });
+
+    // Verificar token com Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email) return res.status(400).json({ error: "Token inválido." });
+
+    const { email, name, sub: googleId, picture } = payload;
+
+    // Buscar ou criar usuário
+    let { rows } = await query<UserRow>(
+      `SELECT id, email, role, name, company_id, totp_enabled, totp_secret, three_fa_enabled, avatar_url
+       FROM users WHERE email = $1 OR google_id = $2 LIMIT 1`,
+      [email.toLowerCase(), googleId]
+    );
+
+    let user = rows[0];
+
+    if (!user) {
+      // Cadastro automático via Google (demandante por padrão)
+      const newUser = await query<UserRow>(
+        `INSERT INTO users (name, email, role, auth_provider, google_id, email_verified_at, avatar_url, password_hash)
+         VALUES ($1, $2, 'demandante', 'google', $3, NOW(), $4, '')
+         RETURNING id, email, role, name, company_id, totp_enabled, totp_secret, three_fa_enabled, avatar_url`,
+        [name || email.split("@")[0], email.toLowerCase(), googleId, picture || null]
+      );
+      user = newUser.rows[0];
+      await audit(req, "Cadastro via Google OAuth", "auth");
+    } else if (!user.google_id) {
+      // Vincular conta existente ao Google
+      await query(
+        `UPDATE users SET google_id = $1, auth_provider = 'google', avatar_url = COALESCE(avatar_url, $2) WHERE id = $3`,
+        [googleId, picture || null, user.id]
+      );
+      await audit(req, "Conta vinculada ao Google OAuth", "auth");
+    }
+
+    // Se 3FA habilitado, não pode pular mesmo com Google
+    if (user.three_fa_enabled) {
+      await send3faCode(user.id, email.toLowerCase(), req);
+      return res.status(200).json({ code: "3fa_required", userId: user.id });
+    }
+
+    const { token, csrf } = signAccessToken(user);
+    const refresh = await issueRefreshToken(user.id, req.get("user-agent"), req.ip);
+    setRefreshCookie(res, refresh.refreshToken, refresh.expiresAt);
+    setAccessCookie(res, token);
+    setCsrfCookie(res, csrf);
+
+    res.json({
+      token,
+      csrfToken: csrf,
+      refreshToken: refresh.refreshToken,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── 3FA: enviar código por e-mail ──────────────────────────────────────────
+
+router.post("/3fa/send", authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId } = req.body as { userId?: string };
+    if (!userId) return res.status(400).json({ error: "userId obrigatório." });
+
+    const { rows } = await query<{ email: string; three_fa_enabled: boolean }>(
+      `SELECT email, three_fa_enabled FROM users WHERE id = $1`,
+      [userId]
+    );
+    const user = rows[0];
+    if (!user || !user.three_fa_enabled) return res.status(400).json({ error: "3FA não habilitado." });
+
+    await send3faCode(userId, user.email, req);
+    res.json({ message: "Código enviado por e-mail." });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── 3FA: verificar código e finalizar login ─────────────────────────────────
+
+router.post("/3fa/verify", authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId, code } = req.body as { userId?: string; code?: string };
+    if (!userId || !code) return res.status(400).json({ error: "userId e code são obrigatórios." });
+
+    // Buscar código válido mais recente
+    const { rows: codeRows } = await query<{ id: string; code: string }>(
+      `SELECT id, code FROM three_fa_codes
+       WHERE user_id = $1 AND used = FALSE AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    if (!codeRows.length || codeRows[0].code !== code) {
+      return res.status(401).json({ error: "Código inválido ou expirado.", code: "3fa_invalid" });
+    }
+
+    // Marcar código como usado
+    await query(`UPDATE three_fa_codes SET used = TRUE WHERE id = $1`, [codeRows[0].id]);
+
+    // Buscar usuário e emitir tokens
+    const { rows } = await query<UserRow>(
+      `SELECT id, email, role, name, company_id, avatar_url FROM users WHERE id = $1`,
+      [userId]
+    );
+    const user = rows[0];
+    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
+
+    const { token, csrf } = signAccessToken(user);
+    const refresh = await issueRefreshToken(user.id, req.get("user-agent"), req.ip);
+    setRefreshCookie(res, refresh.refreshToken, refresh.expiresAt);
+    setAccessCookie(res, token);
+    setCsrfCookie(res, csrf);
+
+    await audit(req, "Login 3FA verificado", "auth");
+
+    res.json({
+      token,
+      csrfToken: csrf,
+      refreshToken: refresh.refreshToken,
+      user,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── 3FA: ativar/desativar ───────────────────────────────────────────────────
+
+router.patch("/3fa/toggle", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as any).user?.userId;
+    const { enabled } = req.body as { enabled: boolean };
+    await query(`UPDATE users SET three_fa_enabled = $1 WHERE id = $2`, [!!enabled, userId]);
+    await audit(req, `3FA ${enabled ? "ativado" : "desativado"}`, "auth");
+    res.json({ three_fa_enabled: !!enabled });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
