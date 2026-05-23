@@ -11,10 +11,22 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
+vi.mock("@react-oauth/google", () => ({
+  GoogleLogin: ({ onError }: any) => (
+    <button type="button" onClick={onError}>
+      Login com Google
+    </button>
+  ),
+  GoogleOAuthProvider: ({ children }: any) => <>{children}</>,
+}));
+
 vi.mock("../../app/AuthContext", () => ({
   useAuth: () => ({
     user: null,
     login: vi.fn().mockResolvedValue(undefined),
+    loginGoogle: vi.fn().mockResolvedValue(undefined),
+    verify3fa: vi.fn().mockResolvedValue(undefined),
+    resend3fa: vi.fn().mockResolvedValue(undefined),
     logout: vi.fn(),
     loginErr: "",
     loginLoading: false,
