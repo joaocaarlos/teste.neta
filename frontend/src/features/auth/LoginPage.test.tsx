@@ -33,19 +33,12 @@ vi.mock("../../app/AuthContext", () => ({
   }),
 }));
 
-vi.mock("../../components/ui/Input", () => ({
-  Input: ({ label, type, value, onChange, placeholder, disabled }: any) => (
-    <div>
-      <label>{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        disabled={disabled}
-      />
-    </div>
-  ),
+vi.mock("../../utils/constants", () => ({
+  DEMO_USERS: {
+    demandante: { email: "joao@metalparts.com.br", password: "demo123" },
+    fornecedor:  { email: "pedro@metalprime.com.br",  password: "demo123" },
+    admin:       { email: "admin@capacity.com.br",    password: "admin123" },
+  },
 }));
 
 // ─── Component under test ─────────────────────────────────────────────────────
@@ -62,40 +55,82 @@ describe("LoginPage", () => {
   it("renders the login form with email and password fields", () => {
     const { container } = render(<LoginPage />);
     expect(container.firstChild).not.toBeNull();
-    // Email field is rendered via the mocked Input component with label "E-mail"
     expect(screen.getByText("E-mail")).toBeInTheDocument();
-    // Password label is rendered inline
     expect(screen.getByText("Senha")).toBeInTheDocument();
   });
 
-  it('shows "Entrar" submit button', () => {
+  it('shows "Entrar na Plataforma" submit button', () => {
     render(<LoginPage />);
-    expect(screen.getByRole("button", { name: /entrar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /entrar na plataforma/i })).toBeInTheDocument();
   });
 
-  it("shows local error when email is empty and form is submitted", async () => {
+  it("renders all three role tabs", () => {
     render(<LoginPage />);
-    const submitBtn = screen.getByRole("button", { name: /entrar/i });
+    expect(screen.getByRole("button", { name: /demandante/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /fornecedor/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /admin/i })).toBeInTheDocument();
+  });
+
+  it("shows demo credentials panel", () => {
+    render(<LoginPage />);
+    expect(screen.getByText("CREDENCIAIS DEMO PREENCHIDAS")).toBeInTheDocument();
+  });
+
+  it("pre-fills demo credentials for demandante by default", () => {
+    render(<LoginPage />);
+    const emailInput = screen.getByPlaceholderText("seu@email.com") as HTMLInputElement;
+    expect(emailInput.value).toBe("joao@metalparts.com.br");
+  });
+
+  it("switches credentials when fornecedor tab is clicked", async () => {
+    render(<LoginPage />);
+    const fornecedorBtn = screen.getByRole("button", { name: /fornecedor/i });
+    fireEvent.click(fornecedorBtn);
+    await waitFor(() => {
+      const emailInput = screen.getByPlaceholderText("seu@email.com") as HTMLInputElement;
+      expect(emailInput.value).toBe("pedro@metalprime.com.br");
+    });
+  });
+
+  it("switches credentials when admin tab is clicked", async () => {
+    render(<LoginPage />);
+    const adminBtn = screen.getByRole("button", { name: /admin/i });
+    fireEvent.click(adminBtn);
+    await waitFor(() => {
+      const emailInput = screen.getByPlaceholderText("seu@email.com") as HTMLInputElement;
+      expect(emailInput.value).toBe("admin@capacity.com.br");
+    });
+  });
+
+  it("shows local error when email is cleared and form is submitted", async () => {
+    render(<LoginPage />);
+    const emailInput = screen.getByPlaceholderText("seu@email.com");
+    fireEvent.change(emailInput, { target: { value: "" } });
+    const submitBtn = screen.getByRole("button", { name: /entrar na plataforma/i });
     fireEvent.click(submitBtn);
     await waitFor(() => {
       expect(screen.getByText("Informe o e-mail.")).toBeInTheDocument();
     });
   });
 
-  it("shows local error when password is empty and email is filled", async () => {
+  it("shows local error when password is cleared and email is filled", async () => {
     render(<LoginPage />);
-    const emailInput = screen.getByPlaceholderText("seu@email.com");
-    fireEvent.change(emailInput, { target: { value: "test@example.com" } });
-    const submitBtn = screen.getByRole("button", { name: /entrar/i });
+    const pwdInput = screen.getByPlaceholderText("••••••••");
+    fireEvent.change(pwdInput, { target: { value: "" } });
+    const submitBtn = screen.getByRole("button", { name: /entrar na plataforma/i });
     fireEvent.click(submitBtn);
     await waitFor(() => {
       expect(screen.getByText("Informe a senha.")).toBeInTheDocument();
     });
   });
 
-  it("renders role selector buttons", () => {
+  it("shows VOLTAR PARA A LANDING link", () => {
     render(<LoginPage />);
-    expect(screen.getByText("Sou demandante")).toBeInTheDocument();
-    expect(screen.getByText("Sou fornecedor")).toBeInTheDocument();
+    expect(screen.getByText(/VOLTAR PARA A LANDING/i)).toBeInTheDocument();
+  });
+
+  it("renders Google login button", () => {
+    render(<LoginPage />);
+    expect(screen.getByText("Login com Google")).toBeInTheDocument();
   });
 });
