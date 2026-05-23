@@ -112,4 +112,18 @@ test.describe("Acessibilidade — WCAG 2.1 AA", () => {
       );
     }
   });
+
+  test("botões de ícone têm aria-label", async ({ page }) => {
+    await page.goto(BASE);
+    await dismissCookies(page);
+    // Get all buttons without visible text
+    const iconButtons = await page.locator('button:not(:has-text(""))').all();
+    for (const btn of iconButtons.slice(0, 5)) {
+      const ariaLabel = await btn.getAttribute("aria-label");
+      const text = (await btn.textContent())?.trim();
+      if (!text) {
+        expect(ariaLabel, `Button should have aria-label`).toBeTruthy();
+      }
+    }
+  });
 });
