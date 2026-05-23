@@ -3,12 +3,30 @@
  */
 import { Router, Request, Response, NextFunction } from "express";
 import { body } from "express-validator";
+import { z } from "zod";
 import { query } from "../db";
 import { authenticate, authorize } from "../middleware/auth";
 import { audit } from "../lib/audit";
 import { validate, v } from "../lib/validators";
+import { validateZod } from "../middleware/validate";
 import { calcScore } from "../lib/score";
 import { ok } from "../lib/response";
+
+const createDemandSchema = z.object({
+  title: z.string().min(3).max(200),
+  description: z.string().min(10).max(5000).optional(),
+  category: z.string().min(1).optional(),
+  process: z.string().min(2).max(100),
+  material: z.string().optional(),
+  quantity: z.number().positive().optional(),
+  unit: z.string().optional(),
+  budget: z.union([z.string(), z.number().nonnegative()]).optional(),
+  deadline: z.string().optional(),
+  urgency: z.enum(["Baixa", "Media", "Alta", "Critica"]).optional(),
+  location: z.string().optional(),
+  certRequired: z.string().optional(),
+  ndaRequired: z.boolean().optional(),
+});
 
 const router = Router();
 
@@ -58,6 +76,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 router.post(
   "/",
   authenticate,
+  validateZod(createDemandSchema),
   validate([
     body("title").isString().isLength({ min: 5, max: 200 }),
     body("description").optional().isString().isLength({ max: 5000 }),

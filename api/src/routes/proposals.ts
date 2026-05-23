@@ -1,16 +1,36 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { body } from "express-validator";
+import { z } from "zod";
 import { query, transaction } from "../db";
 import { authenticate, authorize } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { audit } from "../lib/audit";
 import { newProposalId, newOrderId, newContractId, newTxnId } from "../lib/idgen";
 import { validate, v } from "../lib/validators";
+import { validateZod } from "../middleware/validate";
 import { calcScore } from "../lib/score";
 import { sseEmit } from "../lib/sse";
 import { emailTemplates, sendEmail } from "../lib/email";
 import { makeUploader, persistUpload } from "../lib/upload";
 import { createNotification } from "./notifications";
+
+const createProposalSchema = z.object({
+  demand_id: z.string().min(1, "demand_id obrigatório"),
+  price: z.number().positive().optional(),
+  total: z.string().min(1, "total obrigatório"),
+  total_raw: z.number().nonnegative().optional(),
+  unit_price: z.string().optional(),
+  description: z.string().min(10).max(5000).optional(),
+  days: z.number().int().positive().optional(),
+  start_date: z.string().optional(),
+  cert: z.string().optional(),
+  risk: z.enum(["Baixo", "Medio", "Médio", "Alto", "Critico", "Crítico"]).optional(),
+  frete: z.string().optional(),
+  payment: z.string().optional(),
+  obs: z.string().max(2000).optional(),
+  expires_at: z.string().optional().nullable(),
+  risk_factors: z.array(z.unknown()).optional(),
+});
 
 const router = Router();
 const proposalUpload = makeUploader("doc");
@@ -207,6 +227,7 @@ router.post(
   "/",
   authenticate,
   authorize("fornecedor"),
+  validateZod(createProposalSchema),
   validate([
     v.notEmptyString("demand_id", 20),
     v.notEmptyString("total", 50),

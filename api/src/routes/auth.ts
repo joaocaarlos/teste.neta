@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import speakeasy from "speakeasy";
 import { body } from "express-validator";
+import { z } from "zod";
 import { query } from "../db";
 import { authenticate, revokeAccessToken } from "../middleware/auth";
 import { audit } from "../lib/audit";
@@ -18,9 +19,27 @@ import {
   rotateRefreshToken,
 } from "../lib/tokens";
 import { validate, v } from "../lib/validators";
+import { validateZod } from "../middleware/validate";
 import { checkPasswordStrength } from "../lib/password-policy";
 import { logSecurityEvent } from "../lib/security-events";
 import { recordFailure as recordCaptchaFailure, clearFailures as clearCaptchaFailures, requireCaptchaAfterFailures } from "../middleware/captcha";
+
+const loginSchema = z.object({
+  email: z.string().email("Email inválido"),
+  password: z.string().min(1, "Senha obrigatória"),
+  role: z.enum(["demandante", "fornecedor", "admin"]).optional(),
+  totp: z.string().min(6).max(8).optional(),
+});
+
+const registerSchema = z.object({
+  name: z.string().min(2, "Nome muito curto").max(100),
+  email: z.string().email("Email inválido"),
+  password: z.string().min(8, "Mínimo 8 caracteres"),
+  role: z.enum(["demandante", "fornecedor"]),
+  cnpj: z.string().optional(),
+  companyName: z.string().min(2).max(200),
+  city: z.string().optional(),
+});
 
 const router = Router();
 
@@ -183,6 +202,7 @@ router.post(
   authRateLimit,
   loginLimiter,
   requireCaptchaAfterFailures(captchaIdentifier),
+  validateZod(loginSchema),
   validate([
     v.email("email"),
     body("password").isString().isLength({ min: 6 }).withMessage("Senha invalida."),
@@ -310,6 +330,7 @@ router.post(
 router.post(
   "/register",
   authRateLimit,
+  validateZod(registerSchema),
   validate([
     v.email("email"),
     v.password("password"),
