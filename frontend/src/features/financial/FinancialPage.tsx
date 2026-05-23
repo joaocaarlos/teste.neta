@@ -248,6 +248,7 @@ function Pagination({
       <button
         onClick={onPrev}
         disabled={page === 1}
+        aria-label="Página anterior"
         style={{
           display: "flex",
           alignItems: "center",
@@ -275,6 +276,7 @@ function Pagination({
       <button
         onClick={onNext}
         disabled={page === totalPages}
+        aria-label="Próxima página"
         style={{
           display: "flex",
           alignItems: "center",

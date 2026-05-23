@@ -26,6 +26,7 @@ import { normDemand, normOrder, normProposal } from "../../utils";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAuth } from "../../app/AuthContext";
 import { useWindowSize } from "../../hooks/useWindowSize";
+import { useI18n } from "../../i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,11 +82,13 @@ const STATUS_COLORS: Record<string, string> = {
   Recusada: "var(--red)",
 };
 
-function getGreeting(): string {
+type GreetingKey = "dashboard.greeting.morning" | "dashboard.greeting.afternoon" | "dashboard.greeting.evening";
+
+function getGreetingKey(): GreetingKey {
   const h = new Date().getHours();
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  return "Boa noite";
+  if (h < 12) return "dashboard.greeting.morning";
+  if (h < 18) return "dashboard.greeting.afternoon";
+  return "dashboard.greeting.evening";
 }
 
 function fmtDate(dateStr?: string): string {
@@ -266,7 +269,8 @@ function DashboardDemandante({
   loading: boolean;
   user: { name?: string; company?: string } | null;
 }) {
-  const greeting = getGreeting();
+  const { t } = useI18n();
+  const greeting = t(getGreetingKey());
   const { isMobile } = useWindowSize();
   const publishedCount = demands.filter((d) => d.status === "Publicado").length;
   const activeOrders = orders.filter((o) => o.status !== "Finalizado" && o.status !== "Cancelado" && o.status !== "Entregue").length;
@@ -292,16 +296,16 @@ function DashboardDemandante({
           onClick={() => { window.location.href = "/nova-demanda"; }}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", background: "var(--amber)", border: "none", color: "var(--bg)", fontFamily: "var(--cond)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", cursor: "pointer" }}
         >
-          <Plus size={16} /> Nova Demanda
+          <Plus size={16} /> {t("dashboard.new_demand")}
         </button>
       </div>
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 8 : 10, marginBottom: 24 }}>
-        <KpiCard label="Demandas publicadas" value={loading ? "—" : publishedCount} sub="abertas no mercado" icon={ClipboardList} color="var(--amber)" />
-        <KpiCard label="Propostas recebidas" value={loading ? "—" : proposals.length} sub="no total" icon={FileText} color="var(--blue)" />
-        <KpiCard label="Pedidos em andamento" value={loading ? "—" : activeOrders} sub="em produção" icon={Package} color="var(--purple)" />
-        <KpiCard label="Valor em escrow" value={loading ? "—" : escrowFmt} sub="retido na plataforma" icon={DollarSign} color="var(--green)" />
+        <KpiCard label={t("dashboard.kpi.published_demands")} value={loading ? "—" : publishedCount} sub="abertas no mercado" icon={ClipboardList} color="var(--amber)" />
+        <KpiCard label={t("dashboard.kpi.received_proposals")} value={loading ? "—" : proposals.length} sub="no total" icon={FileText} color="var(--blue)" />
+        <KpiCard label={t("dashboard.kpi.active_orders")} value={loading ? "—" : activeOrders} sub="em produção" icon={Package} color="var(--purple)" />
+        <KpiCard label={t("dashboard.kpi.escrow_value")} value={loading ? "—" : escrowFmt} sub="retido na plataforma" icon={DollarSign} color="var(--green)" />
       </div>
 
       {/* Main grid: feed + top demands */}
@@ -384,7 +388,8 @@ function DashboardFornecedor({
   loading: boolean;
   user: { name?: string; company?: string } | null;
 }) {
-  const greeting = getGreeting();
+  const { t } = useI18n();
+  const greeting = t(getGreetingKey());
   const { isMobile } = useWindowSize();
   const activeOrdersCount = orders.filter((o) => o.status !== "Finalizado" && o.status !== "Cancelado" && o.status !== "Entregue").length;
   const now = new Date();
@@ -407,16 +412,16 @@ function DashboardFornecedor({
           </div>
         </div>
         <button onClick={() => { window.location.href = "/demandas"; }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", background: "var(--amber)", border: "none", color: "var(--bg)", fontFamily: "var(--cond)", fontWeight: 700, fontSize: 13, textTransform: "uppercase", letterSpacing: ".06em", cursor: "pointer" }}>
-          <ShoppingBag size={16} /> Ver Demandas
+          <ShoppingBag size={16} /> {t("dashboard.view_demands")}
         </button>
       </div>
 
       {/* KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 8 : 10, marginBottom: 24 }}>
-        <KpiCard label="Demandas no mercado" value={loading ? "—" : marketDemands.length} sub="abertas agora" icon={BarChart2} color="var(--amber)" />
-        <KpiCard label="Propostas enviadas" value={loading ? "—" : sentProposals.length} sub="no total" icon={FileText} color="var(--blue)" />
-        <KpiCard label="Pedidos ativos" value={loading ? "—" : activeOrdersCount} sub="em andamento" icon={Package} color="var(--purple)" />
-        <KpiCard label="Receita do mês" value={loading ? "—" : revenueFmt} sub="este mês" icon={DollarSign} color="var(--green)" />
+        <KpiCard label={t("dashboard.kpi.market_demands")} value={loading ? "—" : marketDemands.length} sub="abertas agora" icon={BarChart2} color="var(--amber)" />
+        <KpiCard label={t("dashboard.kpi.sent_proposals")} value={loading ? "—" : sentProposals.length} sub="no total" icon={FileText} color="var(--blue)" />
+        <KpiCard label={t("dashboard.kpi.active_orders")} value={loading ? "—" : activeOrdersCount} sub="em andamento" icon={Package} color="var(--purple)" />
+        <KpiCard label={t("dashboard.kpi.monthly_revenue")} value={loading ? "—" : revenueFmt} sub="este mês" icon={DollarSign} color="var(--green)" />
       </div>
 
       {/* Urgent banner */}
@@ -498,7 +503,8 @@ function DashboardFornecedor({
 // ─── DashboardAdmin ───────────────────────────────────────────────────────────
 
 function DashboardAdmin({ demands, orders, loading, user }: { demands: DemandSummary[]; orders: OrderSummary[]; loading: boolean; user: { name?: string } | null }) {
-  const greeting = getGreeting();
+  const { t } = useI18n();
+  const greeting = t(getGreetingKey());
   const { isMobile } = useWindowSize();
   return (
     <div style={{ padding: isMobile ? "16px 12px" : "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
@@ -514,7 +520,7 @@ function DashboardAdmin({ demands, orders, loading, user }: { demands: DemandSum
         <KpiCard label="Demandas publicadas" value={loading ? "—" : demands.filter((d) => d.status === "Publicado").length} sub="abertas agora" icon={Activity} color="var(--green)" />
       </div>
       <button onClick={() => { window.location.href = "/admin"; }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 28px", background: "var(--amber)", border: "none", color: "var(--bg)", fontFamily: "var(--cond)", fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".06em", cursor: "pointer" }}>
-        <Settings size={18} /> Ir para painel Admin
+        <Settings size={18} /> {t("dashboard.admin_panel")}
       </button>
     </div>
   );

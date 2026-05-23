@@ -54,6 +54,21 @@ export interface Translations {
   "empty.notifications.title": string;
   "empty.notifications.message": string;
 
+  // Dashboard
+  "dashboard.new_demand": string;
+  "dashboard.view_demands": string;
+  "dashboard.admin_panel": string;
+  "dashboard.greeting.morning": string;
+  "dashboard.greeting.afternoon": string;
+  "dashboard.greeting.evening": string;
+  "dashboard.kpi.published_demands": string;
+  "dashboard.kpi.received_proposals": string;
+  "dashboard.kpi.active_orders": string;
+  "dashboard.kpi.escrow_value": string;
+  "dashboard.kpi.market_demands": string;
+  "dashboard.kpi.sent_proposals": string;
+  "dashboard.kpi.monthly_revenue": string;
+
   // Status
   "status.pending": string;
   "status.approved": string;
@@ -115,6 +130,20 @@ const ptBR: Translations = {
   "empty.notifications.title": "Nenhuma notificação",
   "empty.notifications.message": "Você está em dia.",
 
+  "dashboard.new_demand": "Nova Demanda",
+  "dashboard.view_demands": "Ver Demandas",
+  "dashboard.admin_panel": "Ir para painel Admin",
+  "dashboard.greeting.morning": "Bom dia",
+  "dashboard.greeting.afternoon": "Boa tarde",
+  "dashboard.greeting.evening": "Boa noite",
+  "dashboard.kpi.published_demands": "Demandas publicadas",
+  "dashboard.kpi.received_proposals": "Propostas recebidas",
+  "dashboard.kpi.active_orders": "Pedidos em andamento",
+  "dashboard.kpi.escrow_value": "Valor em escrow",
+  "dashboard.kpi.market_demands": "Demandas no mercado",
+  "dashboard.kpi.sent_proposals": "Propostas enviadas",
+  "dashboard.kpi.monthly_revenue": "Receita do mês",
+
   "status.pending": "Pendente",
   "status.approved": "Aprovado",
   "status.rejected": "Reprovado",
@@ -173,6 +202,20 @@ const enUS: Translations = {
   "empty.orders.message": "Orders appear here when a proposal is accepted.",
   "empty.notifications.title": "No notifications",
   "empty.notifications.message": "You're all caught up.",
+
+  "dashboard.new_demand": "New Demand",
+  "dashboard.view_demands": "View Demands",
+  "dashboard.admin_panel": "Go to Admin Panel",
+  "dashboard.greeting.morning": "Good morning",
+  "dashboard.greeting.afternoon": "Good afternoon",
+  "dashboard.greeting.evening": "Good evening",
+  "dashboard.kpi.published_demands": "Published demands",
+  "dashboard.kpi.received_proposals": "Received proposals",
+  "dashboard.kpi.active_orders": "Active orders",
+  "dashboard.kpi.escrow_value": "Escrow value",
+  "dashboard.kpi.market_demands": "Market demands",
+  "dashboard.kpi.sent_proposals": "Sent proposals",
+  "dashboard.kpi.monthly_revenue": "Monthly revenue",
 
   "status.pending": "Pending",
   "status.approved": "Approved",

@@ -155,7 +155,7 @@ router.post(
          WHERE p.id = $1`,
         [req.params.id]
       );
-      const base = baseRes.rows[0] as Record<string, any> | undefined;
+      const base = baseRes.rows[0] as Record<string, unknown> | undefined;
       if (!base) return res.status(404).json({ error: "Proposta nao encontrada." });
       if (base.status === "Aceita" || base.status === "Retirada") {
         return res.status(409).json({ error: `Proposta nao aceita contraproposta no status ${base.status}.` });
@@ -180,7 +180,7 @@ router.post(
       );
       await query("UPDATE proposals SET status = 'Contraproposta' WHERE id = $1", [base.id]);
       await query("UPDATE demands SET status = 'Em negociação' WHERE id = $1 AND status IN ('Publicado','Em cotação')", [base.demand_id]);
-      const targetUserId = req.user!.userId === base.created_by ? base.sent_by : base.created_by;
+      const targetUserId = (req.user!.userId === base.created_by ? base.sent_by : base.created_by) as string | undefined;
       const targetRole = targetUserId === base.created_by ? "demandante" : "fornecedor";
       if (targetUserId) {
         sseEmit(`user:${targetUserId}`, {

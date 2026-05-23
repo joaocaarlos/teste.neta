@@ -40,7 +40,8 @@ router.get("/status", async (_req: Request, res: Response, next: NextFunction) =
 router.get("/status/incidents", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const { rows } = await query(`SELECT DATE_TRUNC('day', created_at) AS day, COUNT(*) FILTER (WHERE severity = 'critical') AS critical, COUNT(*) FILTER (WHERE severity = 'warning') AS warnings FROM security_events WHERE created_at > NOW() - INTERVAL '30 days' GROUP BY 1 ORDER BY 1 DESC`);
-    res.json({ period: "30 days", days: rows.map((r: any) => ({ date: new Date(r.day).toISOString().split("T")[0], critical: Number(r.critical), warnings: Number(r.warnings) })) });
+    type IncidentRow = { day: Date | string; critical: string | number; warnings: string | number };
+    res.json({ period: "30 days", days: (rows as IncidentRow[]).map((r) => ({ date: new Date(r.day).toISOString().split("T")[0], critical: Number(r.critical), warnings: Number(r.warnings) })) });
   } catch (err) { next(err); }
 });
 

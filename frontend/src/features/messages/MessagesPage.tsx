@@ -276,6 +276,7 @@ function MsgBubble({
             <button
               onClick={() => onEdit(msg.id, msg.msg)}
               title="Editar"
+              aria-label="Editar mensagem"
               style={{
                 background: "transparent",
                 border: "none",
@@ -291,6 +292,7 @@ function MsgBubble({
           <button
             onClick={() => onDelete(msg.id)}
             title="Apagar"
+            aria-label="Apagar mensagem"
             style={{
               background: "transparent",
               border: "none",
@@ -628,6 +630,7 @@ export function MessagesPage() {
                     <button
                       onClick={() => handleEdit(msg.id)}
                       title="Salvar"
+                      aria-label="Salvar edição"
                       style={{
                         background: "var(--amber)",
                         border: "none",
@@ -643,6 +646,7 @@ export function MessagesPage() {
                     <button
                       onClick={() => { setEditingId(null); setEditDraft(""); }}
                       title="Cancelar"
+                      aria-label="Cancelar edição"
                       style={{
                         background: "transparent",
                         border: "1px solid var(--border2)",
@@ -687,6 +691,7 @@ export function MessagesPage() {
             <button
               type="button"
               title="Anexar arquivo"
+              aria-label="Anexar arquivo"
               style={{
                 background: "transparent",
                 border: "1px solid var(--border2)",

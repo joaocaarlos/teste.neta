@@ -43,8 +43,21 @@ export async function stripeWebhook(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
-async function processStripeEvent(event: { id: string; type: string; data: { object: any } }) {
-  const obj = event.data.object;
+interface StripePayload {
+  id?: string;
+  metadata?: Record<string, string> | null;
+  payment_intent?: string | { id?: string };
+  payment_status?: string;
+  amount_total?: number;
+  payment_method?: string;
+  charge?: string;
+  amount?: number;
+  reason?: string;
+  last_payment_error?: { message?: string };
+}
+
+async function processStripeEvent(event: { id: string; type: string; data: { object: unknown } }) {
+  const obj = event.data.object as StripePayload;
   switch (event.type) {
     case "checkout.session.completed": {
       const txId = obj.metadata?.transactionId;

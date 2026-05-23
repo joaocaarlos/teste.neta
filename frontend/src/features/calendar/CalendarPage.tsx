@@ -413,6 +413,7 @@ export function CalendarPage() {
           >
             <button
               onClick={prevMonth}
+              aria-label="Mês anterior"
               style={{
                 background: "transparent",
                 border: "1px solid var(--border2)",
@@ -443,6 +444,7 @@ export function CalendarPage() {
 
             <button
               onClick={nextMonth}
+              aria-label="Próximo mês"
               style={{
                 background: "transparent",
                 border: "1px solid var(--border2)",
