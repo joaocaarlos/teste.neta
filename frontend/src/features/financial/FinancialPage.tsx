@@ -9,6 +9,7 @@ import { apiGet } from "../../services/api";
 import { normTxn } from "../../utils";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Transaction } from "../../types";
+import { useWindowSize } from "../../hooks/useWindowSize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -294,6 +295,7 @@ function Pagination({
 // ─── FinancialPage ────────────────────────────────────────────────────────────
 
 export function FinancialPage() {
+  const { isMobile } = useWindowSize();
   const [allTxns, setAllTxns] = useState<NormTxn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -348,7 +350,7 @@ export function FinancialPage() {
   return (
     <div
       style={{
-        padding: "28px 32px",
+        padding: isMobile ? "16px 12px" : "28px 32px",
         maxWidth: 1100,
         margin: "0 auto",
         fontFamily: "var(--body)",
@@ -361,6 +363,8 @@ export function FinancialPage() {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 24,
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <div>

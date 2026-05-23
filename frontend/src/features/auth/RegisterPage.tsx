@@ -37,7 +37,7 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid var(--border)",
   color: "var(--white)",
   fontFamily: "var(--body)",
-  fontSize: 14,
+  fontSize: "16px",
   padding: "10px 14px",
   outline: "none",
   width: "100%",

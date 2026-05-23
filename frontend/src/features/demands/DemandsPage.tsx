@@ -16,6 +16,7 @@ import { apiGetList, apiDelete } from "../../services/api";
 import { normDemand } from "../../utils";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { useWindowSize } from "../../hooks/useWindowSize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -477,6 +478,7 @@ function Pagination({
 // ─── DemandsPage ──────────────────────────────────────────────────────────────
 
 export function DemandsPage() {
+  const { isMobile } = useWindowSize();
   const [allDemands, setAllDemands] = useState<Demand[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -529,7 +531,7 @@ export function DemandsPage() {
   return (
     <div
       style={{
-        padding: "28px 32px",
+        padding: isMobile ? "16px 12px" : "28px 32px",
         maxWidth: 1100,
         margin: "0 auto",
         fontFamily: "var(--body)",
@@ -542,6 +544,8 @@ export function DemandsPage() {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 24,
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <div>

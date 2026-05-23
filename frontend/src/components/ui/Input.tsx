@@ -54,7 +54,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               border: `1px solid ${error ? color.red : color.border}`,
               color: color.white,
               fontFamily: font.body,
-              fontSize: fontSize.body,
+              fontSize: "16px",
               padding: icon ? "10px 14px 10px 38px" : "10px 14px",
               outline: "none",
               transition: transition.normal,

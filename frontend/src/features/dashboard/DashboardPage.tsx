@@ -25,6 +25,7 @@ import { apiGetList } from "../../services/api";
 import { normDemand, normOrder, normProposal } from "../../utils";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { useAuth } from "../../app/AuthContext";
+import { useWindowSize } from "../../hooks/useWindowSize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -266,6 +267,7 @@ function DashboardDemandante({
   user: { name?: string; company?: string } | null;
 }) {
   const greeting = getGreeting();
+  const { isMobile } = useWindowSize();
   const publishedCount = demands.filter((d) => d.status === "Publicado").length;
   const activeOrders = orders.filter((o) => o.status !== "Finalizado" && o.status !== "Cancelado" && o.status !== "Entregue").length;
   const escrowRaw = orders.filter((o) => o.status !== "Finalizado" && o.status !== "Cancelado" && o.status !== "Entregue").reduce((sum, o) => sum + (o.value_raw || o.gross || 0), 0);
@@ -274,11 +276,11 @@ function DashboardDemandante({
   const weeklyBars = buildWeeklyBars(proposals);
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
+    <div style={{ padding: isMobile ? "16px 12px" : "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontFamily: "var(--cond)", fontSize: 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
+          <h1 style={{ fontFamily: "var(--cond)", fontSize: isMobile ? 22 : 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
             {greeting}, <span style={{ color: "var(--amber)" }}>{user?.name || "Demandante"}</span>
           </h1>
           <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--white3)", letterSpacing: ".08em", marginTop: 4 }}>
@@ -295,7 +297,7 @@ function DashboardDemandante({
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 8 : 10, marginBottom: 24 }}>
         <KpiCard label="Demandas publicadas" value={loading ? "—" : publishedCount} sub="abertas no mercado" icon={ClipboardList} color="var(--amber)" />
         <KpiCard label="Propostas recebidas" value={loading ? "—" : proposals.length} sub="no total" icon={FileText} color="var(--blue)" />
         <KpiCard label="Pedidos em andamento" value={loading ? "—" : activeOrders} sub="em produção" icon={Package} color="var(--purple)" />
@@ -303,7 +305,7 @@ function DashboardDemandante({
       </div>
 
       {/* Main grid: feed + top demands */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 24 }}>
         <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
           <SectionHeader title="Propostas Recebidas" linkHref="/propostas" />
           {loading && Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
@@ -383,6 +385,7 @@ function DashboardFornecedor({
   user: { name?: string; company?: string } | null;
 }) {
   const greeting = getGreeting();
+  const { isMobile } = useWindowSize();
   const activeOrdersCount = orders.filter((o) => o.status !== "Finalizado" && o.status !== "Cancelado" && o.status !== "Entregue").length;
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -391,11 +394,11 @@ function DashboardFornecedor({
   const urgentDemands = marketDemands.filter((d) => hoursUntil(d.deadline) < 48);
 
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
+    <div style={{ padding: isMobile ? "16px 12px" : "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ fontFamily: "var(--cond)", fontSize: 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
+          <h1 style={{ fontFamily: "var(--cond)", fontSize: isMobile ? 22 : 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
             {greeting}, <span style={{ color: "var(--amber)" }}>{user?.name || "Fornecedor"}</span>
           </h1>
           <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--white3)", letterSpacing: ".08em", marginTop: 4 }}>
@@ -409,7 +412,7 @@ function DashboardFornecedor({
       </div>
 
       {/* KPIs */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 8 : 10, marginBottom: 24 }}>
         <KpiCard label="Demandas no mercado" value={loading ? "—" : marketDemands.length} sub="abertas agora" icon={BarChart2} color="var(--amber)" />
         <KpiCard label="Propostas enviadas" value={loading ? "—" : sentProposals.length} sub="no total" icon={FileText} color="var(--blue)" />
         <KpiCard label="Pedidos ativos" value={loading ? "—" : activeOrdersCount} sub="em andamento" icon={Package} color="var(--purple)" />
@@ -430,7 +433,7 @@ function DashboardFornecedor({
       )}
 
       {/* Main grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 24 }}>
         <div style={{ background: "var(--bg2)", border: "1px solid var(--border)", display: "flex", flexDirection: "column" }}>
           <SectionHeader title="Demandas Abertas" linkHref="/demandas" linkLabel="Ver mercado" />
           {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
@@ -496,15 +499,16 @@ function DashboardFornecedor({
 
 function DashboardAdmin({ demands, orders, loading, user }: { demands: DemandSummary[]; orders: OrderSummary[]; loading: boolean; user: { name?: string } | null }) {
   const greeting = getGreeting();
+  const { isMobile } = useWindowSize();
   return (
-    <div style={{ padding: "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
+    <div style={{ padding: isMobile ? "16px 12px" : "28px 32px", maxWidth: 1200, margin: "0 auto", fontFamily: "var(--body)" }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: "var(--cond)", fontSize: 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
+        <h1 style={{ fontFamily: "var(--cond)", fontSize: isMobile ? 22 : 30, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".04em", color: "var(--white)", margin: 0 }}>
           {greeting}, <span style={{ color: "var(--amber)" }}>{user?.name || "Admin"}</span>
         </h1>
         <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--white3)", letterSpacing: ".08em", marginTop: 4 }}>Painel Administrativo</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 28 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? 8 : 10, marginBottom: 28 }}>
         <KpiCard label="Total de demandas" value={loading ? "—" : demands.length} sub="na plataforma" icon={ClipboardList} color="var(--amber)" />
         <KpiCard label="Total de pedidos" value={loading ? "—" : orders.length} sub="gerados" icon={Package} color="var(--blue)" />
         <KpiCard label="Demandas publicadas" value={loading ? "—" : demands.filter((d) => d.status === "Publicado").length} sub="abertas agora" icon={Activity} color="var(--green)" />

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../../services/api";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { useWindowSize } from "../../hooks/useWindowSize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ function SidebarInput({
           border: "1px solid var(--border2)",
           color: "var(--white)",
           fontFamily: "var(--mono)",
-          fontSize: 11,
+          fontSize: "16px",
           padding: "6px 8px",
           width: "100%",
           boxSizing: "border-box",
@@ -475,6 +476,7 @@ function Pagination({
 // ─── SuppliersPage ────────────────────────────────────────────────────────────
 
 export function SuppliersPage() {
+  const { isMobile } = useWindowSize();
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [activeFilters, setActiveFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortOption>("relevance");
@@ -558,7 +560,7 @@ export function SuppliersPage() {
   return (
     <div
       style={{
-        padding: "28px 32px",
+        padding: isMobile ? "16px 12px" : "28px 32px",
         maxWidth: 1300,
         margin: "0 auto",
         fontFamily: "var(--body)",
@@ -641,11 +643,11 @@ export function SuppliersPage() {
       </div>
 
       {/* ─── Main layout: sidebar + results ─────────────────────────────── */}
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20, alignItems: "flex-start" }}>
         {/* ─── Filter sidebar ────────────────────────────────────────────── */}
         <div
           style={{
-            width: 220,
+            width: isMobile ? "100%" : 220,
             flexShrink: 0,
             background: "var(--bg2)",
             border: "1px solid var(--border)",

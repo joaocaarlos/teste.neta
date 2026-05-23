@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../../app/AuthContext";
+import { useWindowSize } from "../../hooks/useWindowSize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,6 +207,7 @@ const FAQ_ITEMS: FaqItem[] = [
 
 export function LandingPage() {
   const { user, authLoading } = useAuth();
+  const { isMobile, isTablet } = useWindowSize();
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
 
   // Redirect authenticated users to dashboard
@@ -275,36 +277,38 @@ export function LandingPage() {
           CAP<span style={{ color: "var(--amber)" }}>A</span>CITY
         </span>
 
-        <div style={{ display: "flex", gap: 28 }}>
-          {[
-            ["Como funciona", "#como-funciona"],
-            ["Segmentos", "#segmentos"],
-            ["Preços", "#precos"],
-            ["FAQ", "#faq"],
-          ].map(([label, href]) => (
-            <a
-              key={label}
-              href={href}
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                letterSpacing: ".1em",
-                textTransform: "uppercase",
-                color: "var(--white2)",
-                cursor: "pointer",
-                textDecoration: "none",
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                document
-                  .querySelector(href)
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              {label}
-            </a>
-          ))}
-        </div>
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 28 }}>
+            {[
+              ["Como funciona", "#como-funciona"],
+              ["Segmentos", "#segmentos"],
+              ["Preços", "#precos"],
+              ["FAQ", "#faq"],
+            ].map(([label, href]) => (
+              <a
+                key={label}
+                href={href}
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  letterSpacing: ".1em",
+                  textTransform: "uppercase",
+                  color: "var(--white2)",
+                  cursor: "pointer",
+                  textDecoration: "none",
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document
+                    .querySelector(href)
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 10 }}>
           <a
@@ -350,7 +354,7 @@ export function LandingPage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          padding: "100px 5% 60px",
+          padding: isMobile ? "90px 16px 48px" : "100px 5% 60px",
           position: "relative",
           zIndex: 1,
         }}
@@ -471,7 +475,7 @@ export function LandingPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4,1fr)",
+            gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)",
             border: "1px solid var(--border)",
             maxWidth: 720,
           }}
@@ -554,7 +558,7 @@ export function LandingPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gridTemplateColumns: isMobile ? "1fr" : isTablet ? "1fr 1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
             gap: 0,
             border: "1px solid var(--border)",
             maxWidth: 960,
@@ -798,7 +802,7 @@ export function LandingPage() {
           </h2>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 1100 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 24, maxWidth: 1100 }}>
           {/* Demandante */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
@@ -878,7 +882,7 @@ export function LandingPage() {
           </h2>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, maxWidth: 1100 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, maxWidth: 1100 }}>
           {TESTIMONIALS.map((t) => (
             <div key={t.company} style={{ background: "var(--bg2)", border: "1px solid var(--border)", padding: "28px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
