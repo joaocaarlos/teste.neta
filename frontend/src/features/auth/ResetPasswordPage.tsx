@@ -186,8 +186,9 @@ export function ResetPasswordPage() {
           /* ─── Form ──────────────────────────────────────────────────────── */
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Nova senha</label>
+              <label htmlFor="reset-password" style={labelStyle}>Nova senha</label>
               <input
+                id="reset-password"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
@@ -199,8 +200,9 @@ export function ResetPasswordPage() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={labelStyle}>Confirmar senha</label>
+              <label htmlFor="reset-confirm" style={labelStyle}>Confirmar senha</label>
               <input
+                id="reset-confirm"
                 type="password"
                 value={form.confirm}
                 onChange={(e) => setForm((f) => ({ ...f, confirm: e.target.value }))}

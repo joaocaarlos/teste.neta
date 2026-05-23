@@ -1,15 +1,10 @@
 /**
  * Smoke test: App renders without crashing and shows the router.
- * LegacyApp is mocked to avoid loading 5k lines in unit tests.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
-vi.mock("../legacy/LegacyApp", () => ({
-  default: () => <div data-testid="legacy-app">LegacyApp</div>,
-}));
-
 vi.mock("../features/marketing/PricingPage", () => ({
   PricingPage: () => <div>Pricing</div>,
 }));

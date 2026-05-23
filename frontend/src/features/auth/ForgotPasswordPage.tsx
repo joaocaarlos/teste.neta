@@ -152,6 +152,7 @@ export function ForgotPasswordPage() {
           <form onSubmit={handleSubmit} noValidate>
             <div style={{ marginBottom: 16 }}>
               <label
+                htmlFor="forgot-email"
                 style={{
                   display: "block",
                   fontFamily: "var(--mono)",
@@ -165,6 +166,7 @@ export function ForgotPasswordPage() {
                 E-mail da conta
               </label>
               <input
+                id="forgot-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

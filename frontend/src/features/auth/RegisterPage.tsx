@@ -47,14 +47,16 @@ const inputStyle: React.CSSProperties = {
 
 function FormField({
   label,
+  id,
   children,
 }: {
   label: string;
+  id: string;
   children: React.ReactNode;
 }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <label style={labelStyle}>{label}</label>
+      <label htmlFor={id} style={labelStyle}>{label}</label>
       {children}
     </div>
   );
@@ -241,8 +243,9 @@ export function RegisterPage() {
 
         {/* ─── Form ─────────────────────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} noValidate>
-          <FormField label="Seu nome">
+          <FormField label="Seu nome" id="register-name">
             <input
+              id="register-name"
               style={inputStyle}
               value={form.name}
               onChange={(e) => upd("name", e.target.value)}
@@ -252,8 +255,9 @@ export function RegisterPage() {
             />
           </FormField>
 
-          <FormField label="E-mail">
+          <FormField label="E-mail" id="register-email">
             <input
+              id="register-email"
               style={inputStyle}
               type="email"
               value={form.email}
@@ -264,8 +268,9 @@ export function RegisterPage() {
             />
           </FormField>
 
-          <FormField label="Senha (mín. 8 caracteres)">
+          <FormField label="Senha (mín. 8 caracteres)" id="register-password">
             <input
+              id="register-password"
               style={inputStyle}
               type="password"
               value={form.password}
@@ -276,8 +281,9 @@ export function RegisterPage() {
             />
           </FormField>
 
-          <FormField label="Nome da empresa">
+          <FormField label="Nome da empresa" id="register-company-name">
             <input
+              id="register-company-name"
               style={inputStyle}
               value={form.companyName}
               onChange={(e) => upd("companyName", e.target.value)}
@@ -287,8 +293,9 @@ export function RegisterPage() {
             />
           </FormField>
 
-          <FormField label="CNPJ">
+          <FormField label="CNPJ" id="register-cnpj">
             <input
+              id="register-cnpj"
               style={inputStyle}
               value={form.cnpj}
               onChange={(e) => upd("cnpj", e.target.value)}
@@ -297,8 +304,9 @@ export function RegisterPage() {
             />
           </FormField>
 
-          <FormField label="Cidade (opcional)">
+          <FormField label="Cidade (opcional)" id="register-city">
             <input
+              id="register-city"
               style={inputStyle}
               value={form.city}
               onChange={(e) => upd("city", e.target.value)}
