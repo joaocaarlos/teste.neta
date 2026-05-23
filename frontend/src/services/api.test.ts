@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { apiFetch, apiGet, apiGetList } from "./api";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -16,6 +16,10 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   Object.defineProperty(document, "cookie", { writable: true, value: "" });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // ─── apiFetch ────────────────────────────────────────────────────────────────
@@ -74,7 +78,7 @@ describe("apiGet", () => {
     expect(result).toEqual({ ok: true, data: [4, 5, 6] });
   });
 
-  it("retorna { ok: false } em erro HTTP", async () => {
+  it("retorna { ok: false } em erro HTTP 4xx (sem retry)", async () => {
     mockFetch({ error: "Forbidden" }, 403);
     const result = await apiGet("/protected");
     expect(result.ok).toBe(false);
@@ -85,8 +89,11 @@ describe("apiGet", () => {
   });
 
   it("retorna { ok: false } em erro de rede", async () => {
+    vi.useFakeTimers();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Network down")));
-    const result = await apiGet("/anywhere");
+    const promise = apiGet("/anywhere");
+    await vi.runAllTimersAsync();
+    const result = await promise;
     expect(result.ok).toBe(false);
   });
 });
@@ -100,8 +107,11 @@ describe("apiGetList", () => {
   });
 
   it("retorna [] em falha sem lançar", async () => {
+    vi.useFakeTimers();
     mockFetch({ error: "err" }, 500);
-    const list = await apiGetList("/broken");
+    const promise = apiGetList("/broken");
+    await vi.runAllTimersAsync();
+    const list = await promise;
     expect(list).toEqual([]);
   });
 

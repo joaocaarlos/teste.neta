@@ -15,6 +15,7 @@ import { GLOBAL_CSS } from "../styles/global";
 import { ErrorBoundary } from "../features/error/ErrorBoundary";
 import { NotFoundPage } from "../features/error/NotFoundPage";
 import { CookieBanner } from "../components/ui/CookieBanner";
+import { ToastContainer } from "../components/layout/ToastContainer";
 import { I18nProvider } from "../i18n";
 import { FullPageSpinner } from "../components/ui/Spinner";
 import { analytics } from "../services/analytics";
@@ -159,6 +160,7 @@ export default function App() {
         <Suspense fallback={<FullPageSpinner label="Carregando…" />}>
           <RouterProvider router={router} />
         </Suspense>
+        <ToastContainer />
         <CookieBanner privacyUrl="/privacidade" />
       </I18nProvider>
     </ErrorBoundary>
