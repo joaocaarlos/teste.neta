@@ -24,7 +24,8 @@ router.get(
       }
 
       const { rows } = await query(
-        `SELECT * FROM recurring_orders
+        `SELECT id, buyer_company_id, supplier_company_id, base_order_id, description, frequency, next_due_at, status, auto_create, created_at, updated_at
+         FROM recurring_orders
          WHERE (buyer_company_id = $1 OR supplier_company_id = $1)
            AND status = $2
          ORDER BY next_due_at ASC`,
@@ -81,7 +82,7 @@ router.post(
         `INSERT INTO recurring_orders
            (buyer_company_id, supplier_company_id, description, frequency, next_due_at, auto_create, base_order_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
+         RETURNING id, buyer_company_id, supplier_company_id, base_order_id, description, frequency, next_due_at, status, auto_create, created_at, updated_at`,
         [
           companyId,
           supplier_company_id,
@@ -113,7 +114,8 @@ router.get(
         buyer_company_id: string;
         supplier_company_id: string;
       }>(
-        `SELECT * FROM recurring_orders WHERE id = $1`,
+        `SELECT id, buyer_company_id, supplier_company_id, base_order_id, description, frequency, next_due_at, status, auto_create, created_at, updated_at
+         FROM recurring_orders WHERE id = $1`,
         [req.params.id]
       );
 
@@ -193,7 +195,7 @@ router.patch(
 
       params.push(req.params.id);
       const { rows } = await query(
-        `UPDATE recurring_orders SET ${sets.join(", ")} WHERE id = $${p} RETURNING *`,
+        `UPDATE recurring_orders SET ${sets.join(", ")} WHERE id = $${p} RETURNING id, buyer_company_id, supplier_company_id, base_order_id, description, frequency, next_due_at, status, auto_create, created_at, updated_at`,
         params
       );
 

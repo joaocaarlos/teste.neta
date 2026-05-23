@@ -38,7 +38,8 @@ router.get(
       if (!companyId) return fail(res, "Usuário sem empresa associada.", "NO_COMPANY", 400);
 
       const { rows } = await query(
-        `SELECT * FROM machines WHERE company_id = $1 ORDER BY name ASC`,
+        `SELECT id, company_id, name, type, brand, model, year, status, available_capacity, total_capacity, description, created_at
+         FROM machines WHERE company_id = $1 ORDER BY name ASC`,
         [companyId]
       );
       ok(res, rows);
@@ -74,7 +75,7 @@ router.post(
       const { rows } = await query(
         `INSERT INTO machines (company_id, name, type, capacity, description)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
+         RETURNING id, company_id, name, type, brand, model, year, status, available_capacity, total_capacity, description, created_at`,
         [companyId, name, type, capacity ?? null, description ?? null]
       );
 
@@ -96,7 +97,8 @@ router.get(
         id: string;
         company_id: string;
       }>(
-        `SELECT * FROM machines WHERE id = $1`,
+        `SELECT id, company_id, name, type, brand, model, year, status, available_capacity, total_capacity, description, created_at
+         FROM machines WHERE id = $1`,
         [req.params.id]
       );
 
@@ -166,7 +168,7 @@ router.patch(
 
       params.push(req.params.id);
       const { rows } = await query(
-        `UPDATE machines SET ${sets.join(", ")} WHERE id = $${p} RETURNING *`,
+        `UPDATE machines SET ${sets.join(", ")} WHERE id = $${p} RETURNING id, company_id, name, type, brand, model, year, status, available_capacity, total_capacity, description, created_at`,
         params
       );
 

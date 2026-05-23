@@ -26,7 +26,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await query(
-      `SELECT * FROM ndas ${where} ORDER BY created_at DESC`,
+      `SELECT id, demand_id, supplier_company_id, status, signed_at, document_hash, expires_at, created_at FROM ndas ${where} ORDER BY created_at DESC`,
       params
     );
     res.json(rows);
@@ -35,7 +35,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 
 router.get("/:id", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows } = await query("SELECT * FROM ndas WHERE id = $1", [req.params.id]);
+    const { rows } = await query("SELECT id, demand_id, supplier_company_id, status, signed_at, document_hash, expires_at, created_at FROM ndas WHERE id = $1", [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "NDA não encontrado." });
     res.json(rows[0]);
   } catch (err) { next(err); }
@@ -61,7 +61,7 @@ router.post(
       const id = await newNdaId();
       const { rows } = await query(
         `INSERT INTO ndas (id, demand_id, contraparte, status)
-         VALUES ($1, $2, $3, 'Pendente') RETURNING *`,
+         VALUES ($1, $2, $3, 'Pendente') RETURNING id, demand_id, supplier_company_id, status, signed_at, document_hash, expires_at, created_at`,
         [id, demand_id, contraparte]
       );
       await audit(req, "NDA criado", "nda", id);
@@ -89,7 +89,7 @@ router.post("/:id/sign", authenticate, async (req: Request, res: Response, next:
     const { rows } = await query(
       `UPDATE ndas
        SET signed_at = $1, signed_by = $2, ip = $3, status = 'Ativo', expires_at = $4
-       WHERE id = $5 RETURNING *`,
+       WHERE id = $5 RETURNING id, demand_id, supplier_company_id, status, signed_at, document_hash, expires_at, created_at`,
       [now, req.user!.userId, ip, expires.toISOString().slice(0, 10), req.params.id]
     );
 
@@ -108,7 +108,7 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response, nex
     }
 
     const { rows } = await query(
-      "UPDATE ndas SET status = 'Cancelado' WHERE id = $1 RETURNING *",
+      "UPDATE ndas SET status = 'Cancelado' WHERE id = $1 RETURNING id, demand_id, supplier_company_id, status, signed_at, document_hash, expires_at, created_at",
       [req.params.id]
     );
     await audit(req, "NDA cancelado", "nda", req.params.id);

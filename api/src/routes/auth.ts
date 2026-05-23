@@ -55,6 +55,22 @@ const loginLimiter = rateLimit({
   message: { error: "Muitas tentativas de login. Aguarde 15 minutos." },
 });
 
+// Auth endpoints — limite restrito
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 10,
+  message: { error: "Muitas tentativas. Tente novamente em 15 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip ?? "unknown",
+});
+
+const forgotPasswordLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 5,
+  message: { error: "Limite de tentativas atingido. Tente em 1 hora." },
+});
+
 function createCsrfToken(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
@@ -164,6 +180,7 @@ router.get("/csrf", (_req: Request, res: Response) => {
 
 router.post(
   "/login",
+  authRateLimit,
   loginLimiter,
   requireCaptchaAfterFailures(captchaIdentifier),
   validate([
@@ -292,6 +309,7 @@ router.post(
 
 router.post(
   "/register",
+  authRateLimit,
   validate([
     v.email("email"),
     v.password("password"),
@@ -367,6 +385,7 @@ router.post(
 
 router.post(
   "/forgot-password",
+  forgotPasswordLimit,
   requireCaptchaAfterFailures(captchaIdentifier),
   validate([v.email("email")]),
   async (req: Request, res: Response, next: NextFunction) => {
@@ -436,7 +455,7 @@ async function verifyEmailToken(req: Request, res: Response, next: NextFunction)
 router.get("/verify-email", verifyEmailToken);
 router.post("/verify-email", verifyEmailToken);
 
-router.post("/resend-verification", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post("/resend-verification", forgotPasswordLimit, authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { rows } = await query<{ id: string; email: string; name: string; email_verified_at: Date | null }>(
       "SELECT id, email, name, email_verified_at FROM users WHERE id = $1",

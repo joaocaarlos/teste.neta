@@ -80,7 +80,8 @@ router.get(
       }
 
       const { rows } = await query(
-        `SELECT * FROM calendar_slots
+        `SELECT id, machine_id, year, month, day, turn, status, order_id, start_at, end_at, created_at
+         FROM calendar_slots
          WHERE ${conditions.join(" AND ")}
          ORDER BY day ASC, turn ASC`,
         params
@@ -147,7 +148,7 @@ router.post(
              status   = EXCLUDED.status,
              start_at = EXCLUDED.start_at,
              end_at   = EXCLUDED.end_at
-           RETURNING *`,
+           RETURNING id, machine_id, year, month, day, turn, status, order_id, start_at, end_at, created_at`,
           [
             companyId,
             slot.machine_id ?? null,

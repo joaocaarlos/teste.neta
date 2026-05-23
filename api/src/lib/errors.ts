@@ -95,10 +95,16 @@ export function isApplicationError(err: unknown): err is ApplicationError {
   return err instanceof ApplicationError;
 }
 
-export function parseDatabaseError(err: any): ApplicationError {
-  const pgErr = err as { code?: string; constraint?: string; detail?: string };
-  if (pgErr.code === "23505") return new ConflictError("Registro duplicado.", { constraint: pgErr.constraint });
-  if (pgErr.code === "23503") return new ValidationError("Referência inválida.", { constraint: pgErr.constraint, detail: pgErr.detail });
-  if (pgErr.code === "23514") return new ValidationError("Dados inválidos.", { constraint: pgErr.constraint });
+interface PgError {
+  code?: string;
+  constraint?: string;
+  detail?: string;
+  message: string;
+}
+
+export function parseDatabaseError(err: PgError): ApplicationError {
+  if (err.code === "23505") return new ConflictError("Registro duplicado.", { constraint: err.constraint });
+  if (err.code === "23503") return new ValidationError("Referência inválida.", { constraint: err.constraint, detail: err.detail });
+  if (err.code === "23514") return new ValidationError("Dados inválidos.", { constraint: err.constraint });
   return new DatabaseError("Erro ao acessar banco de dados");
 }

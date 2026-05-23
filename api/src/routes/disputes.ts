@@ -41,14 +41,14 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
     if (orderId) { conditions.push(`d.order_id = $${p}`); params.push(orderId); p++; }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const { rows } = await query(`SELECT d.* FROM disputes d ${where} ORDER BY d.created_at DESC`, params);
+    const { rows } = await query(`SELECT d.id, d.order_id, d.opened_by, d.status, d.description, d.admin_decision, d.admin_reason, d.refund_percent, d.due_at, d.resolved_at, d.created_at FROM disputes d ${where} ORDER BY d.created_at DESC`, params);
     res.json(rows);
   } catch (err) { next(err); }
 });
 
 router.get("/:id", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows } = await query("SELECT * FROM disputes WHERE id = $1", [req.params.id]);
+    const { rows } = await query("SELECT id, order_id, opened_by, status, description, admin_decision, admin_reason, refund_percent, due_at, resolved_at, created_at FROM disputes WHERE id = $1", [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Disputa não encontrada." });
     if (!(await canAccessDispute(req, req.params.id))) {
       return res.status(403).json({ error: "Permissao insuficiente." });
@@ -168,7 +168,7 @@ router.post("/", authenticate, validate([
     const result = await transaction(async (client) => {
       const { rows } = await client.query(
         `INSERT INTO disputes (id, order_id, type, impact, demandante, fornecedor, description, date, status, due_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aberta', NOW() + INTERVAL '3 days') RETURNING *`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aberta', NOW() + INTERVAL '3 days') RETURNING id, order_id, opened_by, status, description, admin_decision, admin_reason, refund_percent, due_at, resolved_at, created_at`,
         [id, order_id, type, impact || "Médio", demandante, fornecedor, description || null, today]
       );
       await client.query(
@@ -215,7 +215,7 @@ router.post("/:id/resolve", authenticate, authorize("admin"), validate([
 
     const today = new Date().toLocaleDateString("pt-BR");
     const { rows } = await query(
-      `UPDATE disputes SET status = 'Resolvida', parecer = $1, resolved_at = $2, resolved_by = $3, resolution = $5 WHERE id = $4 RETURNING *`,
+      `UPDATE disputes SET status = 'Resolvida', parecer = $1, resolved_at = $2, resolved_by = $3, resolution = $5 WHERE id = $4 RETURNING id, order_id, opened_by, status, description, admin_decision, admin_reason, refund_percent, due_at, resolved_at, created_at`,
       [req.body.parecer || null, today, req.user!.userId, req.params.id, req.body.resolution || "no_action"]
     );
     await query(`UPDATE transactions SET status = 'Retido' WHERE order_id = $1 AND status = 'Em disputa'`, [cur.rows[0].order_id]);
@@ -230,7 +230,7 @@ router.post("/:id/close", authenticate, authorize("admin"), async (req: Request,
     if (!cur.rows[0]) return res.status(404).json({ error: "Disputa não encontrada." });
     try { assertTransition(disputeTransitions, cur.rows[0].status, "Encerrada", "status da disputa"); }
     catch (e) { return res.status(400).json({ error: (e as Error).message }); }
-    const { rows } = await query("UPDATE disputes SET status = 'Encerrada' WHERE id = $1 RETURNING *", [req.params.id]);
+    const { rows } = await query("UPDATE disputes SET status = 'Encerrada' WHERE id = $1 RETURNING id, order_id, opened_by, status, description, admin_decision, admin_reason, refund_percent, due_at, resolved_at, created_at", [req.params.id]);
     await audit(req, "Disputa encerrada", "disputa", req.params.id);
     res.json(rows[0]);
   } catch (err) { next(err); }

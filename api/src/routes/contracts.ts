@@ -27,7 +27,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await query(
-      `SELECT * FROM contracts ${where} ORDER BY generated_at DESC`,
+      `SELECT id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at FROM contracts ${where} ORDER BY generated_at DESC`,
       params
     );
     res.json(rows);
@@ -36,7 +36,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 
 router.get("/:id", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows } = await query("SELECT * FROM contracts WHERE id = $1", [req.params.id]);
+    const { rows } = await query("SELECT id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at FROM contracts WHERE id = $1", [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Contrato não encontrado." });
 
     const c = rows[0] as { demandante_id: string; fornecedor_id: string };
@@ -116,7 +116,7 @@ router.get("/:id/pdf", authenticate, async (req: Request, res: Response, next: N
 
 router.post("/:id/sign", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows: cur } = await query("SELECT * FROM contracts WHERE id = $1", [req.params.id]);
+    const { rows: cur } = await query("SELECT id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at, scope, content_hash, demandante_id, fornecedor_id, signed_demandante_at, signed_fornecedor_at FROM contracts WHERE id = $1", [req.params.id]);
     if (!cur[0]) return res.status(404).json({ error: "Contrato não encontrado." });
 
     const c = cur[0] as {
@@ -177,7 +177,7 @@ router.post("/:id/sign", authenticate, async (req: Request, res: Response, next:
       alreadyOther = !!c.signed_demandante_at;
     } else {
       await audit(req, "Contrato visualizado por admin", "contrato", req.params.id);
-      const { rows } = await query("SELECT * FROM contracts WHERE id = $1", [req.params.id]);
+      const { rows } = await query("SELECT id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at FROM contracts WHERE id = $1", [req.params.id]);
       return res.json(rows[0]);
     }
 
@@ -193,7 +193,7 @@ router.post("/:id/sign", authenticate, async (req: Request, res: Response, next:
       );
     }
 
-    const final = await query("SELECT * FROM contracts WHERE id = $1", [req.params.id]);
+    const final = await query("SELECT id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at, demandante_id, fornecedor_id FROM contracts WHERE id = $1", [req.params.id]);
     const finalContract = final.rows[0] as { status: string; demandante_id: string; fornecedor_id: string };
 
     const otherCompanyId = isDemandante ? c.fornecedor_id : c.demandante_id;
@@ -240,7 +240,7 @@ router.post("/:id/cancel", authenticate, async (req: Request, res: Response, nex
     }
 
     const { rows } = await query(
-      "UPDATE contracts SET status = 'Cancelado' WHERE id = $1 RETURNING *",
+      "UPDATE contracts SET status = 'Cancelado' WHERE id = $1 RETURNING id, order_id, demand_id, buyer_company_id, supplier_company_id, status, signed_by_buyer_at, signed_by_supplier_at, generated_at, created_at",
       [req.params.id]
     );
     await audit(req, "Contrato cancelado", "contrato", req.params.id);

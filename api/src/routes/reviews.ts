@@ -23,7 +23,7 @@ router.get("/", authenticate, async (req: Request, res: Response, next: NextFunc
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const { rows } = await query(
-      `SELECT r.*, u.name AS reviewer_name FROM reviews r LEFT JOIN users u ON u.id = r.from_user ${where} ORDER BY r.created_at DESC`,
+      `SELECT r.id, r.order_id, r.from_company_id, r.to_company_id, r.rating, r.comment, r.reply, r.created_at, u.name AS reviewer_name FROM reviews r LEFT JOIN users u ON u.id = r.from_user ${where} ORDER BY r.created_at DESC`,
       params
     );
     res.json(rows);
@@ -49,7 +49,7 @@ router.get("/stats/supplier/:company", authenticate, async (req: Request, res: R
 
 router.get("/:id", authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { rows } = await query("SELECT * FROM reviews WHERE id = $1", [req.params.id]);
+    const { rows } = await query("SELECT id, order_id, from_company_id, to_company_id, rating, comment, reply, created_at FROM reviews WHERE id = $1", [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Avaliação não encontrada." });
     res.json(rows[0]);
   } catch (err) { next(err); }
@@ -94,7 +94,7 @@ router.post("/", authenticate, authorize("demandante", "fornecedor"), validate([
     const today = new Date().toLocaleDateString("pt-BR");
     const { rows } = await query(
       `INSERT INTO reviews (id, order_id, from_company, from_user, rating, comment, date, criterios)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, order_id, from_company_id, to_company_id, rating, comment, reply, created_at`,
       [id, order_id, reviewer.company || reviewer.name, req.user!.userId, rating, comment || null, today, JSON.stringify(criterios || [])]
     );
     await audit(req, "Avaliação enviada", "review", id);
@@ -112,7 +112,7 @@ router.patch("/:id/reply", authenticate, validate([v.notEmptyString("reply", 200
       return res.status(403).json({ error: "Autor não pode responder à própria review." });
     }
     const { rows } = await query(
-      "UPDATE reviews SET reply = $1, reply_at = NOW() WHERE id = $2 RETURNING *",
+      "UPDATE reviews SET reply = $1, reply_at = NOW() WHERE id = $2 RETURNING id, order_id, from_company_id, to_company_id, rating, comment, reply, created_at",
       [req.body.reply, req.params.id]
     );
     await audit(req, "Resposta de avaliação", "review", req.params.id);
@@ -123,7 +123,7 @@ router.patch("/:id/reply", authenticate, validate([v.notEmptyString("reply", 200
 router.patch("/:id/moderate", authenticate, authorize("admin"), validate([body("moderated").isBoolean()]), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { rows } = await query(
-      "UPDATE reviews SET moderated = $1 WHERE id = $2 RETURNING *",
+      "UPDATE reviews SET moderated = $1 WHERE id = $2 RETURNING id, order_id, from_company_id, to_company_id, rating, comment, reply, created_at",
       [req.body.moderated, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Avaliação não encontrada." });
