@@ -32,6 +32,48 @@ router.get("/:companyId/members", authenticate, async (req: Request, res: Respon
   } catch (err) { next(err); }
 });
 
+// GET /company/:companyId/my-role — papel do usuário autenticado na empresa
+router.get("/:companyId/my-role", authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { companyId } = req.params;
+    const userId = (req as any).user?.userId;
+
+    const { rows: roleRows } = await query<{
+      role_id: string;
+      role_name: string;
+      hierarchy_level: number;
+    }>(
+      `SELECT cr.id AS role_id, cr.name AS role_name, cr.hierarchy_level
+       FROM company_members cm
+       JOIN company_roles cr ON cr.id = cm.role_id
+       WHERE cm.user_id = $1 AND cm.company_id = $2 AND cm.status = 'active'
+       LIMIT 1`,
+      [userId, companyId]
+    );
+
+    if (!roleRows[0]) {
+      return res.status(404).json({ error: "Usuário não é membro ativo desta empresa." });
+    }
+
+    const { role_id, role_name, hierarchy_level } = roleRows[0];
+
+    const { rows: permRows } = await query<{ code: string }>(
+      `SELECT p.code
+       FROM role_permissions rp
+       JOIN permissions p ON p.id = rp.permission_id
+       WHERE rp.role_id = $1 AND rp.allowed = TRUE`,
+      [role_id]
+    );
+
+    res.json({
+      roleId: role_id,
+      roleName: role_name,
+      hierarchyLevel: hierarchy_level,
+      permissions: permRows.map(r => r.code),
+    });
+  } catch (err) { next(err); }
+});
+
 // POST /company/:companyId/members/invite — convidar membro
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -121,9 +163,77 @@ router.patch("/:companyId/members/:memberId/role", authenticate, validateZod(cha
     const { companyId, memberId } = req.params;
     const userId = (req as any).user?.userId;
     const { roleId } = req.body;
+
     if (!(await userCan(userId, companyId, "roles.edit"))) {
       return res.status(403).json({ error: "Sem permissão para alterar cargos." });
     }
+
+    // 1. Obter hierarchy_level do solicitante
+    const { rows: requesterRows } = await query<{ hierarchy_level: number }>(
+      `SELECT cr.hierarchy_level
+       FROM company_members cm
+       JOIN company_roles cr ON cm.role_id = cr.id
+       WHERE cm.user_id = $1 AND cm.company_id = $2 AND cm.status = 'active'`,
+      [userId, companyId]
+    );
+    if (!requesterRows[0]) {
+      return res.status(403).json({ error: "Você não é membro ativo desta empresa." });
+    }
+    const requesterLevel = requesterRows[0].hierarchy_level;
+
+    // 2. Obter hierarchy_level do cargo alvo
+    const { rows: targetRoleRows } = await query<{ hierarchy_level: number }>(
+      `SELECT hierarchy_level FROM company_roles WHERE id = $1 AND company_id = $2`,
+      [roleId, companyId]
+    );
+    if (!targetRoleRows[0]) {
+      return res.status(400).json({ error: "Cargo não encontrado." });
+    }
+    const targetRoleLevel = targetRoleRows[0].hierarchy_level;
+
+    // 3. Obter membro alvo e seu hierarchy_level atual
+    const { rows: targetMemberRows } = await query<{ user_id: string; hierarchy_level: number | null }>(
+      `SELECT cm.user_id, cr.hierarchy_level
+       FROM company_members cm
+       LEFT JOIN company_roles cr ON cm.role_id = cr.id
+       WHERE cm.id = $1 AND cm.company_id = $2`,
+      [memberId, companyId]
+    );
+    if (!targetMemberRows[0]) {
+      return res.status(404).json({ error: "Membro não encontrado." });
+    }
+    const targetMemberLevel = targetMemberRows[0].hierarchy_level ?? 0;
+
+    // 4. Verificar escalonamento de privilégio: não pode atribuir cargo acima do próprio nível
+    if (targetRoleLevel > requesterLevel) {
+      return res.status(403).json({ error: "Você não pode atribuir um cargo com nível hierárquico superior ao seu." });
+    }
+
+    // 5. Não pode modificar membro no mesmo nível ou acima
+    if (targetMemberLevel >= requesterLevel) {
+      return res.status(403).json({ error: "Você não pode alterar o cargo de um membro com nível hierárquico igual ou superior ao seu." });
+    }
+
+    // 6. Verificar se a mudança removeria o último administrador (membro com nível máximo)
+    const { rows: adminCountRows } = await query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM company_members cm
+       JOIN company_roles cr ON cm.role_id = cr.id
+       WHERE cm.company_id = $1 AND cr.hierarchy_level = (
+         SELECT MAX(hierarchy_level) FROM company_roles WHERE company_id = $1
+       ) AND cm.status = 'ativo'`,
+      [companyId]
+    );
+    const adminCount = parseInt(adminCountRows[0]?.count ?? "0", 10);
+    // Se o membro alvo tem o nível máximo e há só 1, impedir rebaixamento
+    const maxLevelResult = await query<{ max_level: number }>(
+      `SELECT MAX(hierarchy_level) AS max_level FROM company_roles WHERE company_id = $1`,
+      [companyId]
+    );
+    const maxLevel = maxLevelResult.rows[0]?.max_level ?? 0;
+    if (targetMemberLevel === maxLevel && targetRoleLevel < maxLevel && adminCount <= 1) {
+      return res.status(400).json({ error: "Não é possível remover o último administrador da empresa." });
+    }
+
     const { rowCount } = await query(
       "UPDATE company_members SET role_id = $1 WHERE id = $2 AND company_id = $3",
       [roleId, memberId, companyId]
@@ -161,6 +271,36 @@ router.delete("/:companyId/members/:memberId", authenticate, async (req: Request
     if (!(await userCan(userId, companyId, "members.remove"))) {
       return res.status(403).json({ error: "Sem permissão." });
     }
+
+    // Verificar se é o último administrador
+    const memberRoleResult = await query<{ hierarchy_level: number | null }>(
+      `SELECT cr.hierarchy_level
+       FROM company_members cm
+       LEFT JOIN company_roles cr ON cm.role_id = cr.id
+       WHERE cm.id = $1 AND cm.company_id = $2`,
+      [memberId, companyId]
+    );
+    if (memberRoleResult.rows[0]) {
+      const memberLevel = memberRoleResult.rows[0].hierarchy_level ?? 0;
+      const maxLevelResult = await query<{ max_level: number }>(
+        `SELECT MAX(hierarchy_level) AS max_level FROM company_roles WHERE company_id = $1`,
+        [companyId]
+      );
+      const maxLevel = maxLevelResult.rows[0]?.max_level ?? 0;
+      if (memberLevel === maxLevel) {
+        const { rows: adminCountRows } = await query<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM company_members cm
+           JOIN company_roles cr ON cm.role_id = cr.id
+           WHERE cm.company_id = $1 AND cr.hierarchy_level = $2 AND cm.status = 'ativo'`,
+          [companyId, maxLevel]
+        );
+        const adminCount = parseInt(adminCountRows[0]?.count ?? "0", 10);
+        if (adminCount <= 1) {
+          return res.status(400).json({ error: "Não é possível remover o último administrador da empresa." });
+        }
+      }
+    }
+
     const { rowCount } = await query(
       "DELETE FROM company_members WHERE id = $1 AND company_id = $2",
       [memberId, companyId]

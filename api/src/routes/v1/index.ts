@@ -26,6 +26,7 @@ import proposalTemplatesRoutes from "../proposal-templates";
 import marketplaceRoutes   from "../marketplace";
 import companyMembersRouter from "../company-members";
 import companyRolesRouter   from "../company-roles";
+import surveysRoutes        from "../surveys";
 
 const router = Router();
 
@@ -55,5 +56,6 @@ router.use("/proposal-templates", proposalTemplatesRoutes);
 router.use("/marketplace",        marketplaceRoutes);
 router.use("/company",            companyMembersRouter);
 router.use("/company",            companyRolesRouter);
+router.use("/surveys",            surveysRoutes);
 
 export default router;

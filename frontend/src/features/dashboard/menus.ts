@@ -2,14 +2,15 @@ import {
   LayoutDashboard, Plus, ClipboardList, Factory, BarChart2,
   Package, Lock, Repeat, MessageCircle, CreditCard, Star,
   BadgeCheck, Settings, Cpu, Calendar, Inbox, FileCheck,
-  UserCheck, DollarSign, AlertTriangle, ScrollText, Users, Shield,
+  UserCheck, DollarSign, AlertTriangle, ScrollText, Users, Shield, Bell,
   type LucideIcon,
 } from "lucide-react";
 
 export interface MenuItem {
   id: string;
-  icon: LucideIcon;
+  icon: LucideIcon | string;
   label: string;
+  href?: string;
 }
 
 export type UserRole = "demandante" | "fornecedor" | "admin";
@@ -24,6 +25,7 @@ export const MENUS: Record<UserRole, MenuItem[]> = {
     { id: "dashboard",             icon: LayoutDashboard, label: "Dashboard"          },
     { id: "nova-demanda",          icon: Plus,            label: "Nova Demanda"       },
     { id: "demandas",              icon: ClipboardList,   label: "Minhas Demandas"    },
+    { id: "demandas/kanban",       icon: "⊞",             label: "Kanban",              href: "/demandas/kanban" },
     { id: "fornecedores",          icon: Factory,         label: "Fornecedores"       },
     { id: "comparar",              icon: BarChart2,       label: "Comparar Propostas" },
     { id: "pedidos",               icon: Package,         label: "Pedidos"            },
@@ -35,6 +37,7 @@ export const MENUS: Record<UserRole, MenuItem[]> = {
     { id: "verificacao",           icon: BadgeCheck,      label: "Verificação"        },
     { id: "empresa/membros",       icon: Users,           label: "Membros"            },
     { id: "empresa/cargos",        icon: Shield,          label: "Cargos"             },
+    { id: "configuracoes/notificacoes", icon: Bell,       label: "Notificações",       href: "/configuracoes/notificacoes" },
     { id: "config",                icon: Settings,        label: "Configurações"      },
   ],
 
@@ -53,6 +56,7 @@ export const MENUS: Record<UserRole, MenuItem[]> = {
     { id: "verificacao",           icon: BadgeCheck,      label: "Verificação"       },
     { id: "empresa/membros",       icon: Users,           label: "Membros"            },
     { id: "empresa/cargos",        icon: Shield,          label: "Cargos"             },
+    { id: "configuracoes/notificacoes", icon: Bell,       label: "Notificações",       href: "/configuracoes/notificacoes" },
     { id: "config",                icon: Settings,        label: "Configurações"     },
   ],
 

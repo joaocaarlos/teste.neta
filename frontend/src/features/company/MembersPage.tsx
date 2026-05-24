@@ -28,12 +28,20 @@ interface Role {
   member_count: number;
 }
 
+interface MyRole {
+  roleId: string;
+  roleName: string;
+  hierarchyLevel: number;
+  permissions: string[];
+}
+
 export function MembersPage() {
   const { user } = useAuth();
   const companyId = user?.company_id;
 
   const [members, setMembers] = useState<Member[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [myRole, setMyRole] = useState<MyRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -44,12 +52,14 @@ export function MembersPage() {
     if (!companyId) return;
     setLoading(true);
     try {
-      const [membersData, rolesData] = await Promise.all([
+      const [membersData, rolesData, myRoleData] = await Promise.all([
         apiFetch(`/company/${companyId}/members`).then(r => r.json()),
         apiFetch(`/company/${companyId}/roles`).then(r => r.json()),
+        apiFetch(`/company/${companyId}/my-role`).then(r => r.ok ? r.json() : null),
       ]);
       setMembers(Array.isArray(membersData) ? membersData : []);
       setRoles(Array.isArray(rolesData) ? rolesData : []);
+      setMyRole(myRoleData ?? null);
     } catch {
       toast.error("Erro ao carregar membros.");
     } finally {
@@ -115,6 +125,17 @@ export function MembersPage() {
     if (res.ok) { toast.success("Membro removido."); load(); }
     else { const d = await res.json(); toast.error(d.error || "Erro."); }
   };
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  const myHierarchyLevel = myRole?.hierarchyLevel ?? 0;
+
+  /** Roles that the current user can assign (hierarchy_level <= own level) */
+  const assignableRoles = roles.filter(r => r.hierarchy_level <= myHierarchyLevel);
+
+  /** Whether the current user can modify a given member (member's level must be below own level) */
+  const canModifyMember = (memberLevel: number | null) =>
+    (memberLevel ?? 0) < myHierarchyLevel;
 
   // ─── Status badge ──────────────────────────────────────────────────────────
 
@@ -188,7 +209,7 @@ export function MembersPage() {
                 style={{ width: "100%", background: "var(--bg3)", border: "1px solid var(--border)", color: "var(--white)", padding: "10px 12px", fontSize: 14, boxSizing: "border-box", marginBottom: 20 }}
               >
                 <option value="">Selecione o cargo...</option>
-                {roles.map(r => (
+                {assignableRoles.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
@@ -229,49 +250,59 @@ export function MembersPage() {
               </tr>
             </thead>
             <tbody>
-              {members.map(m => (
-                <tr key={m.id} style={{ borderBottom: "1px solid var(--border)", opacity: m.status === "blocked" ? 0.5 : 1 }}>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ fontWeight: 600 }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--white3)", fontFamily: "var(--mono)" }}>{m.email}</div>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <select
-                      value={m.role_id || ""}
-                      onChange={e => handleChangeRole(m.id, e.target.value)}
-                      style={{ background: "var(--bg3)", border: "1px solid var(--border)", color: roleColor(m.hierarchy_level), padding: "4px 8px", fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, cursor: "pointer" }}
-                    >
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{ background: `${statusColor(m.status)}22`, color: statusColor(m.status), border: `1px solid ${statusColor(m.status)}44`, padding: "3px 10px", fontSize: 11, fontFamily: "var(--mono)", letterSpacing: "0.06em" }}>
-                      {statusLabel(m.status)}
-                    </span>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: "var(--white3)", fontSize: 11, fontFamily: "var(--mono)" }}>
-                    {m.joined_at ? new Date(m.joined_at).toLocaleDateString("pt-BR") : "—"}
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() => handleBlock(m.id, m.status !== "blocked")}
-                        style={{ background: "transparent", border: "1px solid var(--border)", color: m.status === "blocked" ? "#22c55e" : "#f59e0b", padding: "4px 10px", fontSize: 11, fontFamily: "var(--mono)", cursor: "pointer" }}
+              {members.map(m => {
+                const canModify = canModifyMember(m.hierarchy_level);
+                return (
+                  <tr key={m.id} style={{ borderBottom: "1px solid var(--border)", opacity: m.status === "blocked" ? 0.5 : 1 }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontWeight: 600 }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--white3)", fontFamily: "var(--mono)" }}>{m.email}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <select
+                        value={m.role_id || ""}
+                        onChange={e => handleChangeRole(m.id, e.target.value)}
+                        disabled={!canModify}
+                        style={{ background: "var(--bg3)", border: "1px solid var(--border)", color: roleColor(m.hierarchy_level), padding: "4px 8px", fontSize: 12, fontFamily: "var(--mono)", fontWeight: 700, cursor: canModify ? "pointer" : "not-allowed", opacity: canModify ? 1 : 0.5 }}
                       >
-                        {m.status === "blocked" ? "Ativar" : "Bloquear"}
-                      </button>
-                      <button
-                        onClick={() => handleRemove(m.id, m.name)}
-                        style={{ background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", padding: "4px 10px", fontSize: 11, fontFamily: "var(--mono)", cursor: "pointer" }}
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* Always show current role even if not assignable */}
+                        {m.role_id && !assignableRoles.find(r => r.id === m.role_id) && (
+                          <option value={m.role_id}>{m.role_name}</option>
+                        )}
+                        {assignableRoles.map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span style={{ background: `${statusColor(m.status)}22`, color: statusColor(m.status), border: `1px solid ${statusColor(m.status)}44`, padding: "3px 10px", fontSize: 11, fontFamily: "var(--mono)", letterSpacing: "0.06em" }}>
+                        {statusLabel(m.status)}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "var(--white3)", fontSize: 11, fontFamily: "var(--mono)" }}>
+                      {m.joined_at ? new Date(m.joined_at).toLocaleDateString("pt-BR") : "—"}
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => handleBlock(m.id, m.status !== "blocked")}
+                          disabled={!canModify}
+                          style={{ background: "transparent", border: "1px solid var(--border)", color: m.status === "blocked" ? "#22c55e" : "#f59e0b", padding: "4px 10px", fontSize: 11, fontFamily: "var(--mono)", cursor: canModify ? "pointer" : "not-allowed", opacity: canModify ? 1 : 0.5 }}
+                        >
+                          {m.status === "blocked" ? "Ativar" : "Bloquear"}
+                        </button>
+                        <button
+                          onClick={() => handleRemove(m.id, m.name)}
+                          disabled={!canModify}
+                          style={{ background: "transparent", border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", padding: "4px 10px", fontSize: 11, fontFamily: "var(--mono)", cursor: canModify ? "pointer" : "not-allowed", opacity: canModify ? 1 : 0.5 }}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {members.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ padding: 40, textAlign: "center", color: "var(--white3)" }}>

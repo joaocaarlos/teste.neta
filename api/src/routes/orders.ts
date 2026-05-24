@@ -146,6 +146,20 @@ router.patch(
            WHERE order_id = $1 AND status = 'Retido'`,
           [req.params.id]
         );
+
+        // Trigger NPS surveys for users of both companies (non-blocking)
+        query(
+          `INSERT INTO nps_surveys (order_id, user_id, role)
+           SELECT $1, u.id, u.role
+           FROM users u
+           WHERE u.company_id IN (
+             SELECT client_id FROM orders WHERE id = $1
+             UNION
+             SELECT supplier_id FROM orders WHERE id = $1
+           )
+           ON CONFLICT (order_id, user_id) DO NOTHING`,
+          [req.params.id]
+        ).catch(() => {});
       }
 
       sseEmit(`company:${cur.rows[0].client_id}`, {

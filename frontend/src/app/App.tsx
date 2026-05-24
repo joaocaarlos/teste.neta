@@ -9,8 +9,9 @@
  *   - 404 page            qualquer rota desconhecida não autenticada
  */
 
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { createBrowserRouter, RouterProvider, useNavigate } from "react-router-dom";
+import { apiFetch } from "../services/api";
 import { GLOBAL_CSS } from "../styles/global";
 import { ErrorBoundary } from "../features/error/ErrorBoundary";
 import { NotFoundPage } from "../features/error/NotFoundPage";
@@ -40,6 +41,8 @@ const DisputeList         = lazy(() => import("../features/disputes/DisputeList"
 const ExecutiveDashboard  = lazy(() => import("../features/admin/ExecutiveDashboard").then(m => ({ default: m.ExecutiveDashboard })));
 const DashboardPage       = lazy(() => import("../features/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
 const DemandsPage         = lazy(() => import("../features/demands/DemandsPage").then(m => ({ default: m.DemandsPage })));
+const DemandKanbanPage    = lazy(() => import("../features/demands/DemandKanbanPage").then(m => ({ default: m.DemandKanbanPage })));
+const NpsSurveyModal      = lazy(() => import("../features/surveys/NpsSurveyModal").then(m => ({ default: m.NpsSurveyModal })));
 const ProposalList        = lazy(() => import("../features/proposals/ProposalList"));
 const ContractList        = lazy(() => import("../features/contracts/ContractList"));
 const DemandWizard        = lazy(() => import("../features/demands/DemandWizard").then(m => ({ default: m.DemandWizard })));
@@ -63,6 +66,7 @@ const RecurringContractsPage = lazy(() => import("../features/recurring/Recurrin
 const MembersPage        = lazy(() => import("../features/company/MembersPage").then(m => ({ default: m.MembersPage })));
 const RolesPage          = lazy(() => import("../features/company/RolesPage").then(m => ({ default: m.RolesPage })));
 const InviteAcceptPage   = lazy(() => import("../features/company/InviteAcceptPage").then(m => ({ default: m.InviteAcceptPage })));
+const NotificationPrefsPage = lazy(() => import("../features/notifications/NotificationPrefsPage").then(m => ({ default: m.NotificationPrefsPage })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -126,6 +130,7 @@ const router = createBrowserRouter([
   { path: "/auth/reset-password",   element: <RouteWrapper><ResetPasswordPage /></RouteWrapper> },
   { path: "/auth/verify-email",     element: <RouteWrapper><VerifyEmailPage /></RouteWrapper> },
   { path: "/dashboard/*",           element: <RouteWrapper><DashboardPage /></RouteWrapper> },
+  { path: "/demandas/kanban",        element: <RouteWrapper><DemandKanbanPage /></RouteWrapper> },
   { path: "/demandas/*",            element: <RouteWrapper><DemandsPage /></RouteWrapper> },
   { path: "/propostas/*",           element: <RouteWrapper><ProposalList /></RouteWrapper> },
   { path: "/pedidos/*",             element: <RouteWrapper><OrdersPage /></RouteWrapper> },
@@ -142,6 +147,7 @@ const router = createBrowserRouter([
   { path: "/empresas/*",            element: <RouteWrapper><CompaniesPage /></RouteWrapper> },
   { path: "/auditoria/*",           element: <RouteWrapper><AuditPage /></RouteWrapper> },
   { path: "/config/*",              element: <RouteWrapper><SettingsPage /></RouteWrapper> },
+  { path: "/configuracoes/notificacoes", element: <RouteWrapper><NotificationPrefsPage /></RouteWrapper> },
   { path: "/configuracoes/*",       element: <RouteWrapper><SettingsPage /></RouteWrapper> },
   { path: "/admin/*",               element: <RouteWrapper><ExecutiveDashboard /></RouteWrapper> },
   { path: "/contratos-recorrentes/*", element: <RouteWrapper><RecurringContractsPage /></RouteWrapper> },
@@ -158,6 +164,85 @@ const router = createBrowserRouter([
   { path: "*", element: <NotFoundRoute /> },
 ]);
 
+// ───── NPS dismiss helper ──────────────────────────────────────────────────
+
+const NPS_DISMISS_KEY = "nps_dismiss_until";
+
+function isNpsDismissed(): boolean {
+  try {
+    const val = localStorage.getItem(NPS_DISMISS_KEY);
+    if (!val) return false;
+    return Date.now() < Number(val);
+  } catch {
+    return false;
+  }
+}
+
+function dismissNpsFor24h(): void {
+  try {
+    localStorage.setItem(NPS_DISMISS_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+  } catch {
+    // ignore
+  }
+}
+
+// ───── NPS survey loader ───────────────────────────────────────────────────
+
+interface NpsSurvey {
+  id: string;
+  order_id: string;
+  order_title?: string;
+  sent_at: string;
+  expires_at: string;
+}
+
+function NpsManager() {
+  const [survey, setSurvey] = useState<NpsSurvey | null>(null);
+
+  useEffect(() => {
+    if (isNpsDismissed()) return;
+    let cancelled = false;
+    apiFetch("/v1/surveys/nps/pending")
+      .then(async (res) => {
+        if (!res.ok || cancelled) return;
+        const json = await res.json().catch(() => null);
+        const rows: NpsSurvey[] = json?.data ?? [];
+        if (rows.length > 0 && !cancelled) setSurvey(rows[0]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!survey) return null;
+
+  const handleSubmit = async (score: number, comment: string) => {
+    try {
+      await apiFetch(`/v1/surveys/nps/${survey.id}`, {
+        method: "POST",
+        body: JSON.stringify({ score, comment }),
+      });
+    } catch {
+      // ignore errors — modal will close anyway
+    }
+    setSurvey(null);
+  };
+
+  const handleClose = () => {
+    dismissNpsFor24h();
+    setSurvey(null);
+  };
+
+  return (
+    <Suspense fallback={null}>
+      <NpsSurveyModal
+        survey={survey}
+        onClose={handleClose}
+        onSubmit={handleSubmit}
+      />
+    </Suspense>
+  );
+}
+
 // ───── Root component ──────────────────────────────────────────────────────
 export default function App() {
   return (
@@ -168,6 +253,7 @@ export default function App() {
         </Suspense>
         <ToastContainer />
         <CookieBanner privacyUrl="/privacidade" />
+        <NpsManager />
       </I18nProvider>
     </ErrorBoundary>
   );
