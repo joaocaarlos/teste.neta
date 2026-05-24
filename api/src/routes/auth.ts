@@ -9,6 +9,7 @@ import { z } from "zod";
 import { OAuth2Client } from "google-auth-library";
 import { query } from "../db";
 import { authenticate, revokeAccessToken } from "../middleware/auth";
+import { seedDefaultRoles } from "../lib/rbac";
 import { audit } from "../lib/audit";
 import { emailTemplates, sendEmail } from "../lib/email";
 import { redis } from "../lib/redis";
@@ -400,6 +401,19 @@ router.post(
         ]
       );
       const userId = userRes.rows[0].id;
+
+      await seedDefaultRoles(companyId);
+      const adminRole = await query<{ id: string }>(
+        "SELECT id FROM company_roles WHERE company_id = $1 AND name = 'ADMIN'",
+        [companyId]
+      );
+      if (adminRole.rows[0]) {
+        await query(
+          `INSERT INTO company_members (company_id, user_id, role_id, status, joined_at)
+           VALUES ($1, $2, $3, 'active', NOW()) ON CONFLICT DO NOTHING`,
+          [companyId, userId, adminRole.rows[0].id]
+        );
+      }
 
       const reqWithUser = Object.assign(Object.create(Object.getPrototypeOf(req)), req, {
         user: { userId, role, companyId },

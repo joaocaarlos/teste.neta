@@ -24,6 +24,8 @@ import feedbackRoutes      from "../feedback";
 import adminRoutes         from "../admin";
 import proposalTemplatesRoutes from "../proposal-templates";
 import marketplaceRoutes   from "../marketplace";
+import companyMembersRouter from "../company-members";
+import companyRolesRouter   from "../company-roles";
 
 const router = Router();
 
@@ -51,5 +53,7 @@ router.use("/feedback",           feedbackRoutes);
 router.use("/admin",              adminRoutes);
 router.use("/proposal-templates", proposalTemplatesRoutes);
 router.use("/marketplace",        marketplaceRoutes);
+router.use("/company",            companyMembersRouter);
+router.use("/company",            companyRolesRouter);
 
 export default router;
