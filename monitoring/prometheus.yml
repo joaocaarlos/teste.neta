@@ -1,0 +1,58 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    app: "capacity"
+    environment: "production"
+
+# Alertmanager configuration (optional — configure if using Alertmanager)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ["alertmanager:9093"]
+
+# Alert rules (optional — add rule files here)
+# rule_files:
+#   - "alerts/*.yml"
+
+scrape_configs:
+  # ── CapaCity API ────────────────────────────────────────────────────────────
+  - job_name: "capacity_api"
+    scrape_interval: 15s
+    metrics_path: "/metrics"
+    # Set this header if METRICS_TOKEN is configured in the API
+    # bearer_token: "<your-metrics-token>"
+    # Authorization via custom header:
+    params: {}
+    static_configs:
+      - targets: ["api:3001"]
+        labels:
+          service: "api"
+    # If METRICS_TOKEN is set, uncomment and configure:
+    # authorization:
+    #   type: Bearer
+    #   credentials_file: /run/secrets/metrics_token
+
+  # ── Prometheus self-monitoring ───────────────────────────────────────────────
+  - job_name: "prometheus"
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── PostgreSQL Exporter (optional) ───────────────────────────────────────────
+  # Uncomment to enable — requires adding postgres_exporter service to docker-compose
+  # - job_name: "postgres"
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["postgres_exporter:9187"]
+  #       labels:
+  #         service: "database"
+
+  # ── Redis Exporter (optional) ────────────────────────────────────────────────
+  # Uncomment to enable — requires adding redis_exporter service to docker-compose
+  # - job_name: "redis"
+  #   scrape_interval: 30s
+  #   static_configs:
+  #     - targets: ["redis_exporter:9121"]
+  #       labels:
+  #         service: "cache"

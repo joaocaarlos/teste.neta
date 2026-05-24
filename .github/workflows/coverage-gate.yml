@@ -1,0 +1,113 @@
+name: Coverage Gate
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    name: Test Coverage ≥ threshold
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install API deps
+        run: npm ci || npm install
+        working-directory: api
+
+      - name: Install coverage provider
+        run: npm install -D @vitest/coverage-v8
+        working-directory: api
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage tests
+        working-directory: api
+        env:
+          NODE_ENV: test
+          REQUIRE_EMAIL_VERIFICATION: "false"
+
+      - name: Enforce coverage thresholds
+        run: |
+          cd api
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "::warning::No coverage summary generated (test runner may not have c8 configured)."
+            exit 0
+          fi
+          STATEMENTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
+          BRANCHES=$(jq '.total.branches.pct' coverage/coverage-summary.json)
+          FUNCTIONS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
+          LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+
+          echo "Statements: ${STATEMENTS}%"
+          echo "Branches:   ${BRANCHES}%"
+          echo "Functions:  ${FUNCTIONS}%"
+          echo "Lines:      ${LINES}%"
+
+          # Limites mínimos crescentes — sobe a barra com o tempo
+          MIN_STMT=30
+          MIN_BRAN=25
+          MIN_FUNC=30
+          MIN_LINE=30
+
+          FAIL=0
+          awk "BEGIN{exit !(${STATEMENTS} < ${MIN_STMT})}" && { echo "::error::Statements ${STATEMENTS}% < ${MIN_STMT}%"; FAIL=1; }
+          awk "BEGIN{exit !(${BRANCHES} < ${MIN_BRAN})}" && { echo "::error::Branches ${BRANCHES}% < ${MIN_BRAN}%"; FAIL=1; }
+          awk "BEGIN{exit !(${FUNCTIONS} < ${MIN_FUNC})}" && { echo "::error::Functions ${FUNCTIONS}% < ${MIN_FUNC}%"; FAIL=1; }
+          awk "BEGIN{exit !(${LINES} < ${MIN_LINE})}" && { echo "::error::Lines ${LINES}% < ${MIN_LINE}%"; FAIL=1; }
+          exit $FAIL
+
+      - name: Coverage summary on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'api/coverage/coverage-summary.json';
+            if (!fs.existsSync(path)) return;
+            const data = JSON.parse(fs.readFileSync(path, 'utf8')).total;
+            const body = [
+              '## Coverage Report',
+              '',
+              '| Métrica    | Pct       |',
+              '|------------|-----------|',
+              `| Statements | ${data.statements.pct}% |`,
+              `| Branches   | ${data.branches.pct}%   |`,
+              `| Functions  | ${data.functions.pct}%  |`,
+              `| Lines      | ${data.lines.pct}%      |`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Dependency review — bloqueia PRs com deps vulneráveis
+  # ────────────────────────────────────────────────────────────────────────────
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, CC0-1.0, Unlicense, BlueOak-1.0.0, CC-BY-4.0

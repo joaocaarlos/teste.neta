@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+Allow: /como-funciona
+Allow: /precos
+Allow: /sobre
+Allow: /empresas/
+
+# Áreas privadas — não indexar
+Disallow: /dashboard
+Disallow: /demandas
+Disallow: /propostas
+Disallow: /pedidos
+Disallow: /contratos
+Disallow: /mensagens
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/
+
+# Crawlers de IA — política explícita (opcional)
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://capacity.com.br/sitemap.xml

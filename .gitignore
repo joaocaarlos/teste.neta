@@ -1,0 +1,15 @@
+.env
+.env.local
+.env.production
+.env.staging
+api/.env
+frontend/.env
+frontend/.env.local
+node_modules/
+api/node_modules/
+frontend/node_modules/
+api/dist/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+*.log
