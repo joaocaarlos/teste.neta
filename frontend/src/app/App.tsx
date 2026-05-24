@@ -60,6 +60,9 @@ const AuditPage           = lazy(() => import("../features/audit/AuditPage").the
 const ProposalComparePage = lazy(() => import("../features/proposals/ProposalComparePage").then(m => ({ default: m.ProposalComparePage })));
 const NDAPage             = lazy(() => import("../features/ndas/NDAPage").then(m => ({ default: m.NDAPage })));
 const RecurringContractsPage = lazy(() => import("../features/recurring/RecurringContractsPage").then(m => ({ default: m.RecurringContractsPage })));
+const MembersPage        = lazy(() => import("../features/company/MembersPage").then(m => ({ default: m.MembersPage })));
+const RolesPage          = lazy(() => import("../features/company/RolesPage").then(m => ({ default: m.RolesPage })));
+const InviteAcceptPage   = lazy(() => import("../features/company/InviteAcceptPage").then(m => ({ default: m.InviteAcceptPage })));
 
 // Injeta CSS global uma única vez
 if (typeof document !== "undefined" && !document.getElementById("cap4-global-css")) {
@@ -147,6 +150,9 @@ const router = createBrowserRouter([
   { path: "/fornecedores/*",        element: <RouteWrapper><SuppliersPage /></RouteWrapper> },
   { path: "/nova-demanda/*",        element: <RouteWrapper><DemandWizard onPublish={async () => { window.location.href = "/demandas"; }} onCancel={() => window.history.back()} /></RouteWrapper> },
   { path: "/acompanhamento/*",      element: <RouteWrapper><OrderTrackingPage /></RouteWrapper> },
+  { path: "/empresa/membros",       element: <RouteWrapper><MembersPage /></RouteWrapper> },
+  { path: "/empresa/cargos",        element: <RouteWrapper><RolesPage /></RouteWrapper> },
+  { path: "/convite/:token",        element: <InviteAcceptPage /> },
 
   // 404 fallback
   { path: "*", element: <NotFoundRoute /> },

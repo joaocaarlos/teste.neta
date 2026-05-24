@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Plus, ClipboardList, Factory, BarChart2,
   Package, Lock, Repeat, MessageCircle, CreditCard, Star,
   BadgeCheck, Settings, Cpu, Calendar, Inbox, FileCheck,
-  UserCheck, DollarSign, AlertTriangle, ScrollText,
+  UserCheck, DollarSign, AlertTriangle, ScrollText, Users, Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +33,8 @@ export const MENUS: Record<UserRole, MenuItem[]> = {
     { id: "financeiro",            icon: CreditCard,      label: "Financeiro"         },
     { id: "avaliacoes",            icon: Star,            label: "Avaliações"         },
     { id: "verificacao",           icon: BadgeCheck,      label: "Verificação"        },
+    { id: "empresa/membros",       icon: Users,           label: "Membros"            },
+    { id: "empresa/cargos",        icon: Shield,          label: "Cargos"             },
     { id: "config",                icon: Settings,        label: "Configurações"      },
   ],
 
@@ -49,6 +51,8 @@ export const MENUS: Record<UserRole, MenuItem[]> = {
     { id: "financeiro",            icon: CreditCard,      label: "Financeiro"        },
     { id: "avaliacoes",            icon: Star,            label: "Avaliações"        },
     { id: "verificacao",           icon: BadgeCheck,      label: "Verificação"       },
+    { id: "empresa/membros",       icon: Users,           label: "Membros"            },
+    { id: "empresa/cargos",        icon: Shield,          label: "Cargos"             },
     { id: "config",                icon: Settings,        label: "Configurações"     },
   ],
 
