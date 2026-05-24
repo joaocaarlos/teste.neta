@@ -1,7 +1,7 @@
 -- NPS surveys triggered after order completion
 CREATE TABLE IF NOT EXISTS nps_surveys (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id    UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id    VARCHAR(20) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role        VARCHAR(20) NOT NULL CHECK (role IN ('demandante','fornecedor')),
   score       SMALLINT CHECK (score BETWEEN 0 AND 10),
